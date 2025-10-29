@@ -1,0 +1,37 @@
+<%@ page import = "java.util.*" %>
+<%@ page contentType="text/html" %>
+
+<%
+	String name = "Hello from JSPZ";
+	String title = "Jspz page";
+	byte[] buffer = null;
+
+	if(request.getRequestMethod().equals("POST")){
+	  buffer = request.getPostData();
+	}
+
+%>
+
+<html>
+<head>
+<title><%=title%></title>
+</head>
+<body>
+<pre>
+
+<%
+        Map <String, String> map = System.getenv();
+        for (Map.Entry <String, String> entry: map.entrySet()) {
+            out.println(entry.getKey() + "=" + entry.getValue());
+        }
+
+%>
+
+</pre>
+<%=request.getQueryString()%>
+
+Hello World - JSPZ awakening...
+
+</body>
+</html>
+

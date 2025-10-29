@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Cornelia Web Server</title>
+    <style>
+                body {
+                        background-color: #000000;
+                        color: #E79F3A;
+                        font-family: Trebuchet MS;
+                }
+                a {
+                        color: #E79F3A;
+                        font-family: Trebuchet MS;
+                        font-size: 18px;
+                }
+        </style>
+    <script>
+     function exec(action) {
+       var xhttp = new XMLHttpRequest();
+       xhttp.onreadystatechange = function() {
+         if (this.readyState == 4 && this.status == 200) {
+           document.getElementById("console").innerHTML = this.responseText;
+         }
+       };
+       xhttp.open("GET", action, true);
+       xhttp.send();
+     }
+</script>
+
+</head>
+
+<body>
+<center>
+<p>&nbsp;</p>
+<div>
+<a href="http://crazedout.com"><img src="cos.png" width="100" border="0"/></a>
+<div>
+<img src="corn2.png"/>
+<p>
+<div>
+<p>If you have followed the <a href="https://github.com/CrazedoutSoft/cornelia/blob/main/README.md">README</a> instructions - all of this should work.</p>
+<table>
+<tr><td><a href="javascript:exec('/cgi-bin/test.cgi')">test.cgi</a></td></tr>
+<tr><td><a href="javascript:exec('python.py')">test.py</a></td></tr>
+<tr><td><a href="javascript:exec('test.php')">test.php</a></td></tr>
+<tr><td><a href="javascript:exec('test.jspz')">test.jspz</a></td></tr>
+<tr><td><a href="javascript:exec('test.jgazm')">test.jgazm</a></td></tr>
+<tr><td><a href="jgonline/">code jgazm online!</a></td></tr>
+<tr><td><a href="upload.html">test file upload</a></td></tr>
+</table>
+<p>
+<span id="console"></span>
+</center>
+</body>
+</html>
+
