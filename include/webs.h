@@ -34,6 +34,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MAX_AUTH_REALMS		64
 #define MAX_CONTENT_TYPES	64
 #define MAX_VIRTUAL_HOSTS	64
+#define MAX_PROXY_TARGETS	64
 #define MAX_VIRTUAL_PATH	256
 #define MAX_VIRTUAL_FILE	256
 #define MAX_HTTP_HEADERS	256
@@ -56,6 +57,14 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <crypt.h>
 
 void handle_request(SOCKET sockfd, char* clientIP, void* cSSL);
+
+typedef struct proxy_targets_t {
+
+	char host[256];
+	char proxy_host[256];
+	int proxy_port;
+
+} proxy_targets;
 
 typedef struct user_endpoint_t {
 
@@ -152,6 +161,7 @@ typedef struct server_conf_t {
 	char keycrt[1024];
 	int  max_keep_alive_requests;
 	int  keep_alive_timeout;
+	proxy_targets* v_proxys[MAX_PROXY_TARGETS];
 	virtual_host* v_hosts[MAX_VIRTUAL_HOSTS];
 	virtual_files* v_files[MAX_VIRTUAL_FILE];
 	unsigned int max_post_data;
@@ -199,7 +209,9 @@ int   socket_read(const http_request* request, char* buffer, int len);
 int   socket_write(const http_request* request, const char* buffer, int len);
 int   exec_request(SOCKET sockfd, char* clientIP, void* cSSL);
 void  check_conf(int use_ssl, int use_tls);
-
+int   handle_proxy(SOCKET sockfd, http_request* request);
+int proxy_connect(char* clientIP, int port);
+void domain_to_ip(char* dest, const char* domain);
 user_endpoint* get_user_endpoint(char* argstr);
 virtual_host* get_virtual_host(char* host);
 

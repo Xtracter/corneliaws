@@ -27,10 +27,11 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #define SERVER_CONF 		"[server_conf]"
 #define AUTH_CONF   		"[auth_conf]"
-#define CONTENT_TYPE_CONF   	"[content_type_conf]"
+#define CONTENT_TYPE_CONF   "[content_type_conf]"
 #define CGI_BIN_CONF		"[cgi_exec_conf]"
-#define VHOSTS_CONF		"[virtual_hosts]"
+#define VHOSTS_CONF			"[virtual_hosts]"
 #define VHOSTS_FILES		"[virtual_files]"
+#define VPROXYS_CONF		"[proxy_targets]"
 
 void print_server_conf(server_conf* serv){
 
@@ -123,6 +124,14 @@ void print_server_conf(server_conf* serv){
         }
         printf("[virtual_files]\n\n");
 
+		printf("[proxy_targets]\n");
+		n=0;
+		while(1){
+			if(serv->v_proxys[n]==NULL) break;
+			printf("%s=%s:%d\n", serv->v_proxys[n]->host, serv->v_proxys[n]->proxy_host, serv->v_proxys[n]->proxy_port);
+			n++;
+		}
+		printf("[proxy_targets]\n");
 }
 
 void read_server_conf(FILE* fd, server_conf* serv){
@@ -257,6 +266,33 @@ void read_auth_conf(FILE* fd, server_conf *serv){
     free(tmp);
     free(realms);
     free(buffer);
+}
+
+void read_proxy_targets(FILE* fd, server_conf *serv){
+
+    char* buffer = (char*)malloc(1024);
+    char* ptr;
+    int   n=0;
+    while(fgets(buffer,1024,fd)!=NULL){
+
+		if(strcmp(clip(buffer),VPROXYS_CONF)==0) break;
+		if(buffer[0]=='#') continue;
+		ptr=strtok(buffer,"=");
+		if(ptr!=NULL){
+			serv->v_proxys[n]=(proxy_targets*)malloc(sizeof(proxy_targets));
+			memset(serv->v_proxys[n],0,sizeof(proxy_targets));
+			strcpy(serv->v_proxys[n]->host,ptr);
+			ptr=strtok(NULL,":");
+			if(ptr!=NULL){
+				strcpy(serv->v_proxys[n]->proxy_host,ptr);
+				ptr=strtok(NULL,":");
+				serv->v_proxys[n]->proxy_port=atoi(ptr);
+			}
+		}
+		n++;
+		serv->v_proxys[n]=NULL;
+	}
+	free(buffer);
 }
 
 void read_content_types(FILE* fd, server_conf *serv){
@@ -398,10 +434,11 @@ int init_conf(const char* conf_file, server_conf *serv){
 	  else if(strcmp(clip(buffer),CGI_BIN_CONF)==0) read_cgi_bin(fd,serv);
 	  else if(strcmp(clip(buffer),VHOSTS_CONF)==0) read_vhosts(fd,serv);
 	  else if(strcmp(clip(buffer),VHOSTS_FILES)==0) read_vfiles(fd,serv);
+	  else if(strcmp(clip(buffer),VPROXYS_CONF)==0) read_proxy_targets(fd,serv);
 	}
      fclose(fd);
     }else{
-     fprintf(stderr, "Bad conf file:%s\n", conf_file);
+     fprintf(stderr,"Bad conf file:%s\n", conf_file);
      free(buffer);
      return -1;
     }
@@ -409,4 +446,16 @@ int init_conf(const char* conf_file, server_conf *serv){
     free(buffer);
 
  return 0;
+}
+
+
+void free_conf(server_conf* serv){
+
+	int n = 0;
+	while(serv->v_proxys[n]!=NULL){
+		printf("Freeing: v_proxys[%d]\n",n);
+		free(serv->v_proxys[n]);
+		n++;
+	}
+
 }
