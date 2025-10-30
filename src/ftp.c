@@ -982,11 +982,12 @@ void usage(){
 	printf("Cornelia simple FTP Server\n");
 	printf("CrazedoutSoft (c) 2022\n\n");
 	printf("usage:\n");
-	printf("ftp_cornelia -root <dir root> -bind <ip> -port <port> (-tls) (-trace) -lip [list availbale ip adresses] -anonymous_allowed\n");
+	printf("ftp_cornelia -root <dir root> -bind <ip> -port <port> (-ftps) (-trace) -lip [list availbale ip adresses] -anonymous_allowed\n");
 	printf("Example:\n");
 	printf(">ftp_cornelia -lip\n");
 	printf("eth0 IP Address 169.254.255.169\nlo IP Address 127.0.0.1\nwifi0 IP Address 192.168.10.145\n");
-	printf("\n>ftp_cornelia -bind 192.168.10.145 -port 8021\n\n");
+	printf(">ftp_cornelia -bind 192.168.10.145 -port 8021\n\n");
+	printf("Use 'implicit FTP over TLS' when in FTPS mode.\n\n");
 }
 
 int main(int args, char* argv[]){
@@ -1023,11 +1024,11 @@ int main(int args, char* argv[]){
 	  else if(strcmp(argv[i],"-trace")==0) {
 	    trace=1;
 	  }
-	  else if(strcmp(argv[i],"-tls")==0) {
+	  else if(strcmp(argv[i],"-ftps")==0) {
 	    #ifndef NO_SSL
 	      mode = FTPS;
 	    #else
-	     printf("\nWARN! Compiled with NO_SSL. -tls is not available.\n");
+	     printf("\nWARN! Compiled with NO_SSL. -ftps is not available.\n");
 	    #endif
 	  }
 	  else if(strcmp(argv[i],"-port")==0){
