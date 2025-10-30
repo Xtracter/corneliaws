@@ -85,7 +85,7 @@ In conf/corny:<br>
 
 ><b>Set up custum endpoints on cmd line:</b><br>
 >bin/cornelia_d -uep:/myendpoint%file:myjson.js%application/json<br>
->bin/cornelia_d -uep:/myendpoint%{\"my\",\"answer\"}%application/json<br>
+>bin/cornelia_d -uep:/myendpoint%{\\\"my\\\",\\\"answer\\\"}%application/json<br>
 >If <i>Content-Type</i> is omitted - application/json is default.<br>
 ><b>http://localhost:8080/myendpoint</b> will respond with supplied response (or from file) with <i>Content-Type</i> or application/json if omitted.
 <p>
