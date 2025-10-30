@@ -24,6 +24,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	Cornelia is his younger sister. She is Small, Fast and Furious...
 	/Fredrik.
 */
+
 #include "../include/mkpasswd.h"
 #include "../include/tls.h"
 #include "../include/ssl.h"
@@ -67,27 +68,26 @@ char  conf_file[1024] = "conf/corny.conf";
 char  cip[16];
 void dump_request(http_request* r);
 user_endpoint* uep = NULL;
+
+
 void usleep(unsigned long);
-char shutd_file[256];
 
 
 void init_server() {
 
-		int loop=1;
-		int connfd;
-		SOCKET port = serv_conf.port;
+	int loop=1;
+	int connfd;
+	SOCKET port = serv_conf.port;
         int sockfd;
-		unsigned int len;
+	unsigned int len;
         struct sockaddr_in servaddr, cli;
         struct sockaddr_in* pV4Addr;
         struct in_addr ipAddr;
-		char buffer[1024];
-		FILE* shutfd;
 
         sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (sockfd == -1) {
-	 	 	perror("Fatal: Socket creation failed.\n");
-	  		exit(-1);
+	  perror("Fatal: Socket creation failed.\n");
+	  exit(-1);
         }
         memset(&servaddr, 0, sizeof(servaddr));
         servaddr.sin_family = AF_INET;
@@ -95,165 +95,46 @@ void init_server() {
         servaddr.sin_port = htons(port);
 
         if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
-		  perror("Fatal: Socket bind failed.\n\nTry bin/restart.sh\n\n");
-		  exit(-1);
+	  perror("Fatal: Socket bind failed.\n\nTry bin/restart.sh\n\n");
+	  exit(-1);
         }
 
         if ((listen(sockfd, 5)) != 0) {
-		  perror("Fatal: sock listen failed.\n\nTry bin/restart.sh\n\n");
-		  exit(-1);
+	  perror("Fatal: sock listen failed.\n\nTry bin/restart.sh\n\n");
+	  exit(-1);
         }
 
         len = sizeof(cli);
         printf("\nCornelia listening on %d [HTTP]\n", serv_conf.port);
 
-		sprintf(buffer,"%s/corny.loc", getenv("CORNELIA_HOME"));
-		printf("%s\n",buffer);
-
-		int pid=0;
         while(loop){
-		  connfd = accept(sockfd, (SA*)&cli, &len);
-		  shutfd = fopen(buffer,"r");
-		  if(shutfd!=NULL && fgets(buffer,1024,shutfd)!=NULL){
-			if(strstr(buffer,"shutdown")!=NULL) {
-				printf("Break\n");
-				break;
-			}
-		  }
-		  fclose(shutfd);
-		  pid = fork();
-		  if(pid>0){
-			memset(&cip[0],0,16);
+	  connfd = accept(sockfd, (SA*)&cli, &len);
+	  int pid = fork();
+	  if(pid>0){
+
+	    memset(&cip[0],0,16);
             pV4Addr = (struct sockaddr_in*)&cli;
             ipAddr = pV4Addr->sin_addr;
             inet_ntop(AF_INET, &ipAddr, &cip[0], INET_ADDRSTRLEN );
 
-		    struct timeval tv;
-		    tv.tv_sec = 0;
-	    	tv.tv_usec = serv_conf.keep_alive_timeout;
-	    	setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
-	    	handle_request(connfd,cip,NULL);
-	    	shutdown(connfd,SHUT_RDWR);
-			loop=0;
-	  	  }
-        }
-		if(pid==0){
-	    	shutdown(connfd,SHUT_RDWR);
-			printf("Cornalia exiting peacefully..\n");
-		}
+	    struct timeval tv;
+	    tv.tv_sec = 0;
+	    tv.tv_usec = serv_conf.keep_alive_timeout;
+	    setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+	    handle_request(connfd,cip,NULL);
+	    shutdown(connfd,SHUT_RDWR);
+
+	    loop=0;
 	    if(c_debug) printf("exit\n");
+	  }
+        }
+        if (connfd < 0) {
+	  perror("Fatal:Server accept failed.\n");
+	  exit(-1);
+        }
 
 }
 
-
-void domain_to_ip(char* dest, const char* domain){
-
-	struct hostent *host_info;
-    	struct in_addr *address;
-
-    	host_info = gethostbyname(domain);
-		address = (struct in_addr *) (host_info->h_addr_list[0]);
-    	strcpy(dest, inet_ntoa(*address));
-}
-
-int proxy_connect(char* clientIP, int port){
-
-    int status, client_fd;
-    struct sockaddr_in serv_addr;
-
-    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("\n Socket creation error \n");
-        return -1;
-    }
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(port);
-
-    if (inet_pton(AF_INET, clientIP, &serv_addr.sin_addr)
-        <= 0) {
-        printf(
-            "\nInvalid address/ Address not supported \n");
-        return -1;
-    }
-
-    if ((status
-         = connect(client_fd, (struct sockaddr*)&serv_addr,
-                   sizeof(serv_addr)))
-        < 0) {
-        printf("\nConnection Failed \n");
-        return -1;
-    }
-
-    return client_fd;
-}
-#define BUFF_SIZE 5000
-
-int handle_proxy(SOCKET sockfd, http_request* request){
-
-	SOCKET clientfd;
-	char* tok;
-	char buffer[BUFF_SIZE];
-	char header[1024];
-	char rem_host[256];
-	int rem_port=0,r,n;
-	char head_host[256];
-
-	memset(buffer,0,BUFF_SIZE);
-	memset(header,0,1024);
-
-	if(c_debug) printf("[handle_proxy]\n");
-
-	strcpy(buffer,get_header(request,"Host="));
-	tok = strtok(buffer,":");
-	if(tok!=NULL){
-		strcpy(rem_host,tok);
-		rem_port=atoi(strtok(NULL,":"));
-	}else return -1;
-
-	n=0;
-	memset(buffer,0,BUFF_SIZE);
-	while(n<64){
-		if(serv_conf.v_proxys[n]==NULL) break;
-		if(strcmp(rem_host,serv_conf.v_proxys[n]->host)==0 ||
-			strcmp("all", serv_conf.v_proxys[n]->host)==0) {
-			domain_to_ip(buffer,serv_conf.v_proxys[n]->proxy_host);
-			rem_port = serv_conf.v_proxys[n]->proxy_port;
-			strcpy(head_host, serv_conf.v_proxys[n]->proxy_host);
-			break;
-		}
-		n++;
-	}
-
-	if(strlen(buffer)==0) return -1;
-
-	printf("%s:%d\n",buffer,rem_port);
-	if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
-	strcpy(buffer,request->request);
-	strcat(buffer,"\n");
-	printf("%s\n",buffer);
-	send(clientfd,buffer,strlen(buffer),0);
-	for(int i=0;i<request->headers_len; i++){
-		memset(buffer,0,BUFF_SIZE);
-		if(strstr(request->headers[i],"Connection=")!=NULL){
-			sprintf(buffer,"Connection: close\n");
-		}else if(strstr(request->headers[i],"Host=")!=NULL){
-			sprintf(buffer,"Host: %s:%d\n", head_host,rem_port);
-		}else{
-			sprintf(buffer,"%s\n",str_replace(request->headers[i],"=",": "));
-		}
-		printf("%s",buffer);
-		send(clientfd,buffer,strlen(buffer),0);
-	}
-	send(clientfd,"\n\n",2,0);
-	send(clientfd,header,strlen(header),0);
-	while((r=read(clientfd,buffer,256))>0){
-		send(sockfd,buffer,r,0);
-	}
-
-	shutdown(clientfd,SHUT_RDWR);
-
-	return 0;
-}
 int get_file_size(const http_request* request){
 
         FILE *fd;
@@ -321,7 +202,7 @@ int readline(const http_request* request, char* buffer, int len){
           return -1; // Socket timed out.
       	default:
 
-        while((r=socket_read(request,&sb[0],1))>0 && n<len-1){
+          while((r=socket_read(request,&sb[0],1))>0 && n<len-1){
 	   if(r==-1) return -1;
            c = sb[0];
            if(c=='\r') continue;
@@ -333,10 +214,8 @@ int readline(const http_request* request, char* buffer, int len){
           }
 	  if(n==0) buffer[0]='\0';
 
-       break;
+          break;
 	}
-
-	if(c_debug) printf("%s\n",buffer);
 
  return n;
 }
@@ -400,7 +279,7 @@ void send_bad_request2(http_request* request){
         socket_write(request, &buffer[0], strlen(&buffer[0]));
         socket_write(request,"\r\n",2);
         socket_write(request, bad_request, strlen(bad_request));
-		socket_write(request, "\n\n",2);
+	socket_write(request, "\n\n",2);
 
         free(buffer);
 }
@@ -991,7 +870,7 @@ int handle_virtual_files(http_request* request){
 
 int parse_http(char* buffer, http_request* request){
 
-    char* ptr;
+        char* ptr;
 	int res = 0;
 
 	if(c_debug) printf("[parse_http]\n");
@@ -999,6 +878,7 @@ int parse_http(char* buffer, http_request* request){
 	ptr=strtok(&buffer[0]," ");
 	if(ptr==NULL) return -1;
 	strcpy(&request->method[0],ptr);
+
 
 	ptr=strtok(NULL," ");
 	if(ptr==NULL) return -1;
@@ -1240,8 +1120,6 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	r=readline(&request, buffer, 2048);
 	if(r<1) return CONN_CLOSE;
 
-	strcpy(request.request,buffer);
-
 	if(c_debug) printf("[readline]\n");
 
 	if(strlen(&serv_conf.logfile[0])>0){
@@ -1259,8 +1137,8 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 
 	if(parse_h==1) {
          free(buffer);
-	     free(tmp);
-		 return ret;
+         free(tmp);
+	 return ret;
 	}
 
 	if(c_debug) printf("[exit parse_http]\n");
@@ -1273,12 +1151,6 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	 parse_headers(buffer,&request);
 	 n++;
 	}
-
-	// Handle proxy redirect if configured.
-	if(serv_conf.v_proxys[0]!=NULL){
-		if(handle_proxy(sockfd,&request)==0) return CONN_CLOSE;
-	}
-
 
 	if(c_debug) printf("[exit read_headers]\n");
 
@@ -1493,7 +1365,6 @@ void usage(){
 	printf("-ssl\t<server_ssl_port>\n");
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
-	printf("-d \tset debug mode\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\"my\":\"content\"}%%application/json\n");
 	printf("                       [-uep:/myendpoint%%file:myjson.js%%application/json\n");
 	printf("\tContent-Type can default to 'application/json' if omitted.\n");
@@ -1537,7 +1408,6 @@ user_endpoint* get_user_endpoint(char* argstr){
   FILE* fd;
   int r=0;
   long fd_len=0;
-
   strcpy(arg, argstr);
 
   user_endpoint* uep = (user_endpoint*)malloc(sizeof(user_endpoint));
@@ -1592,7 +1462,6 @@ user_endpoint* get_user_endpoint(char* argstr){
 
 int main(int args, char* argv[]){
 
-	FILE* fd;
 	int  user_port = 0;
 	int  user_ssl_port=0;
 	int  user_tsl_port=0;
@@ -1601,7 +1470,6 @@ int main(int args, char* argv[]){
 	char* dir = (char*)malloc(1024);
 	int use_ssl=0;
 	int use_tls=0;
-	int n=0;
 
 	get_work_dir(dir,1024);
 
@@ -1644,7 +1512,6 @@ int main(int args, char* argv[]){
                  return -1;
                 }
           }
-	  else if(strcmp(argv[i],"-d")==0) c_debug=1;
 	  else if(strcmp(argv[i],"-ssl")==0) use_ssl=1;
 	  else if(strcmp(argv[i],"-tls")==0) use_tls=1;
 	  else if(strcmp(argv[i],"-i")==0) dump_c=1;
@@ -1671,18 +1538,6 @@ int main(int args, char* argv[]){
 	  if(dump_c) {print_server_conf(&serv_conf);}
 	  else {
 	   check_conf(use_ssl, use_tls);
-		while(serv_conf.v_proxys[n]!=NULL){
-	   		printf("\nRelaying %s to %s:%d",serv_conf.v_proxys[n]->host,
-				serv_conf.v_proxys[n]->proxy_host,serv_conf.v_proxys[n]->proxy_port);
-	   		n++;
-	   }
-
-	   sprintf(shutd_file,"%s/%s",getenv("CORNELIA_HOME"), "corny.loc");
-
-	   fd = fopen(shutd_file,"w");
-	   fprintf(fd,"running\n");
-	   fclose(fd);
-
 	   if(use_ssl==0 && use_tls==0){
 		init_server();
 	   }else if(use_ssl){
@@ -1700,8 +1555,8 @@ int main(int args, char* argv[]){
 		printf("This Cornelia Web Server was compiled without TLS. (make no_ssl)\n");
 		#endif
 	   }
+          }
 	}
-}
 
 	free(bad_request);
 	free(internal_server_error);
