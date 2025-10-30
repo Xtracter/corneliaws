@@ -1085,8 +1085,8 @@ int main(int args, char* argv[]){
 	 printf("Root dir missing - defaulting to $CORNELIA_HOME/ftp\n");
 	}
 
-	if(mode==FTPS) printf("Mode: FTPS %d\n",trace);
-	else printf("Mode: FTP %d\n",trace);
+	if(mode==FTPS) printf("Mode: FTPS - Connect with 'implicit FTP over TLS'.\n");
+	else printf("Mode: FTP (unsafe)\n");
 	init_server(bind, atoi(port), root, mode);
 
 	free(root);
