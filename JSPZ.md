@@ -4,7 +4,7 @@ Cornelia Web Server ships with a simple Java JSP engine.<br/>
 There is no Java container or Servlets. The jspz engine just parses the jsp 'code' into a POJO, compiles and executes.<br/>
 If the source file is older than the class file generated no compilation in done.<p/>
 
-The jspz engine uses "java" and "javac" for its operations. If you with to use other Java distros set theese env varibles:
+The jspz engine uses "java" and "javac" for its operations. If you with to use other Java distros set these env varibles:
 
 <p/>
 
