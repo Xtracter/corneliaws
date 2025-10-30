@@ -208,6 +208,8 @@ char* get_header(const http_request* request, const char* header);
 char* encode_url(unsigned char* url, char* url_enc);
 int   socket_read(const http_request* request, char* buffer, int len);
 int   socket_write(const http_request* request, const char* buffer, int len);
+int   proxy_read(int sockfd, char* buffer, int len, void* cSSL);
+int   proxy_write(int sockfd, const char* buffer, int len, void* cSSL);
 int   exec_request(SOCKET sockfd, char* clientIP, void* cSSL);
 void  check_conf(int use_ssl, int use_tls);
 int   handle_proxy(SOCKET sockfd, http_request* request);

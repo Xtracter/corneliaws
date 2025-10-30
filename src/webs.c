@@ -212,12 +212,13 @@ int handle_proxy(SOCKET sockfd, http_request* request){
                 }
                 n++;
         }
-
-        if(strlen(buffer)==0) return -1;
+	if(c_debug) printf("%s %d\n", buffer, (int)strlen(buffer));
+        if(strlen(buffer)==0) return -2;
 
         if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
 	strcat(request->request,"\n");
         send(clientfd,request->request,strlen(request->request),0);
+	//proxy_write(clientfd,request->request,strlen(request->request),request->cSSL);
 	if(c_debug) printf("\n");
         for(int i=0;i<request->headers_len; i++){
                 memset(buffer,0,BUFF_SIZE);
@@ -230,11 +231,12 @@ int handle_proxy(SOCKET sockfd, http_request* request){
 		}
 		if(c_debug) printf("%s", buffer);
                 send(clientfd,buffer,strlen(buffer),0);
+		//proxy_write(clientfd,buffer,strlen(buffer),request->cSSL);
         }
         send(clientfd,"\n\n",2,0);
-        send(clientfd,header,strlen(header),0);
+        //proxy_write(clientfd,header,strlen(header),request->cSSL);
         while((r=read(clientfd,buffer,256))>0){
-                send(sockfd,buffer,r,0);
+                proxy_write(sockfd,buffer,r,request->cSSL);
         }
 
         close(clientfd);
@@ -327,6 +329,33 @@ int readline(const http_request* request, char* buffer, int len){
  return n;
 }
 
+int proxy_write(int sockfd, const char* buffer, int len, void* cSSL){
+
+	int r = 0;
+	if(cSSL==NULL){
+	  r=write(sockfd, buffer, len);
+	}else{
+	 #ifndef NO_SSL
+	 r=ssl_write(cSSL, buffer, len);
+	 #endif
+	}
+
+  return r;
+}
+
+int proxy_read(int sockfd, char* buffer, int len, void* cSSL){
+
+	int r = 0;
+	if(cSSL==NULL){
+	  r=read(sockfd, buffer, len);
+	}else{
+	  #ifndef NO_SSL
+	  r=ssl_read(cSSL, buffer, len);
+	  #endif
+	}
+  return r;
+}
+
 int socket_read(const http_request* request, char* buffer, int len){
 
 	int r = 0;
@@ -358,8 +387,8 @@ int socket_write(const http_request* request, const char* buffer, int len){
 void send_options_reply(http_request* request){
 
 	socket_write(request, http_options, strlen(http_options));
-
 }
+
 
 void send_bad_request(http_response* response, char* code){
 
@@ -1265,8 +1294,10 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 
 	// Handle proxy relay.
 	if(serv_conf.v_proxys[0]!=NULL){
-	  handle_proxy(sockfd,&request);
-	  return CONN_CLOSE;
+	  if(handle_proxy(sockfd,&request)>-2){
+	  	return CONN_CLOSE;
+	  }
+	  if(c_debug) printf("No prixy match continuing\n");
 	}
 
 	// Set virtual path if Host header matches.

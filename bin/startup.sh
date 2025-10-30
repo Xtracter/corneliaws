@@ -46,7 +46,7 @@ fi
 
 if [[ $1 == "tls" ]];
 then
-$CORNELIA_HOME/bin/cornelia_d -tls $2 -c $2 $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d -tls -d -c $2 $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 if [[ $1 == "all" ]];
