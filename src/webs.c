@@ -1600,7 +1600,7 @@ void usage(){
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
 	printf("-d \tdebug mode\n");
-	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"my\\\":\\\"content\\\"}%%application/json\n");
+	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"name\\\":\\\"value\\\"}%%application/json\n");
 	printf("                       [-uep:/myendpoint%%file:myjson.js%%application/json\n");
 	printf("\tContent-Type can default to 'application/json' if omitted.\n");
 	printf("--help prints this message\n\n");
