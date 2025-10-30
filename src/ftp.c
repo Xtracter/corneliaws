@@ -908,12 +908,14 @@ void init_server(char* pasv_ip, int port, const char* root, int mode) {
 
 	while(loop){
           int client = accept(sock, (struct sockaddr*)&addr, &len);
+	  printf("Conneced\n");
 	  connections++;
           if (client < 0) {
               perror("Unable to accept");
           }else{
 	    if(mode==FTPS){
 	      #ifndef NO_SSL
+	      if(trace) printf("FTPS incoming..\n");
 	      ssl = SSL_new(ctx);
               SSL_set_fd(ssl, client);
 	      if (SSL_accept(ssl) <= 0) {
@@ -980,7 +982,7 @@ void usage(){
 	printf("Cornelia simple FTP Server\n");
 	printf("CrazedoutSoft (c) 2022\n\n");
 	printf("usage:\n");
-	printf("ftp_cornelia -root <dir root> -bind <ip> -port <port> -lip [list availbale ip adresses] -anonymous_allowed\n");
+	printf("ftp_cornelia -root <dir root> -bind <ip> -port <port> (-tls) (-trace) -lip [list availbale ip adresses] -anonymous_allowed\n");
 	printf("Example:\n");
 	printf(">ftp_cornelia -lip\n");
 	printf("eth0 IP Address 169.254.255.169\nlo IP Address 127.0.0.1\nwifi0 IP Address 192.168.10.145\n");
@@ -1029,7 +1031,9 @@ int main(int args, char* argv[]){
 	    #endif
 	  }
 	  else if(strcmp(argv[i],"-port")==0){
-	   if(i<args-1) strcpy(port,argv[i+1]);
+	   if(i<args-1) {
+		strcpy(port,argv[i+1]);
+	   }
 	  }
 	  else if(strcmp(argv[i],"-root")==0){
 	   if(i<args-1) strcpy(root,argv[i+1]);
@@ -1080,6 +1084,8 @@ int main(int args, char* argv[]){
 	 printf("Root dir missing - defaulting to $CORNELIA_HOME/ftp\n");
 	}
 
+	if(mode==FTPS) printf("Mode: FTPS %d\n",trace);
+	else printf("Mode: FTP %d\n",trace);
 	init_server(bind, atoi(port), root, mode);
 
 	free(root);
