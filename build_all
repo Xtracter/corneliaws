@@ -5,12 +5,9 @@ cat conf/head.txt
 make
 
 
-cd jgazm
-./setup_linux
-cd ..
 echo ----------- CORNELIA INSTALLED OK ------------
-echo Please set CORNELIA_HOME to cornelia base dir. export CORNELIA_HOME=$(pwd) 
-echo Please add '$CORNELIA_HOME/jgazm' to PATH.
-echo Start Cornelia HTTP: bin/startup.sh
+echo Please set CORNELIA_HOME to cornelia base dir. ie. export CORNELIA_HOME=$(pwd)
+echo Start Cornelia: bin/startup.sh
+echo Stop Cornelia: bin/shutdown.sh
 
 
