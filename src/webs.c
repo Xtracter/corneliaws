@@ -70,6 +70,7 @@ user_endpoint* uep = NULL;
 void usleep(unsigned long);
 char shutd_file[256];
 
+
 void init_server() {
 
 		int loop=1;
@@ -80,9 +81,8 @@ void init_server() {
         struct sockaddr_in servaddr, cli;
         struct sockaddr_in* pV4Addr;
         struct in_addr ipAddr;
-		char buffer[256];
-		char tmp[2048];
-		FILE* logfd;
+		char buffer[1024];
+		FILE* shutfd;
 
         sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (sockfd == -1) {
@@ -107,18 +107,21 @@ void init_server() {
         len = sizeof(cli);
         printf("\nCornelia listening on %d [HTTP]\n", serv_conf.port);
 
-		if(strlen(&serv_conf.logfile[0])>0){
-		  	sprintf(tmp, "%s/%s", &serv_conf.workdir[0], &serv_conf.logfile[0]);
-	 	 	if((logfd=fopen(tmp,"a"))!=NULL){
-	    		fprintf(logfd,"%s|%d|%s\n", "Startup",serv_conf.port, clip(get_date_time(tmp)));
-	    		fclose(logfd);
-	  		}
-		}
+		sprintf(buffer,"%s/corny.loc", getenv("CORNELIA_HOME"));
+		printf("%s\n",buffer);
 
-
+		int pid=0;
         while(loop){
 		  connfd = accept(sockfd, (SA*)&cli, &len);
-		  int pid = fork();
+		  shutfd = fopen(buffer,"r");
+		  if(shutfd!=NULL && fgets(buffer,1024,shutfd)!=NULL){
+			if(strstr(buffer,"shutdown")!=NULL) {
+				printf("Break\n");
+				break;
+			}
+		  }
+		  fclose(shutfd);
+		  pid = fork();
 		  if(pid>0){
 			memset(&cip[0],0,16);
             pV4Addr = (struct sockaddr_in*)&cli;
@@ -134,7 +137,11 @@ void init_server() {
 			loop=0;
 	  	  }
         }
-	    printf("exit\n");
+		if(pid==0){
+	    	shutdown(connfd,SHUT_RDWR);
+			printf("Cornalia exiting peacefully..\n");
+		}
+	    if(c_debug) printf("exit\n");
 
 }
 
@@ -318,7 +325,7 @@ int readline(const http_request* request, char* buffer, int len){
        break;
 	}
 
-	printf("%s\n",buffer);
+	if(c_debug) printf("%s\n",buffer);
 
  return n;
 }
@@ -1473,6 +1480,7 @@ void usage(){
 	printf("-ssl\t<server_ssl_port>\n");
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
+	printf("-d \tset debug mode\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\"my\":\"content\"}%%application/json\n");
 	printf("                       [-uep:/myendpoint%%file:myjson.js%%application/json\n");
 	printf("\tContent-Type can default to 'application/json' if omitted.\n");
@@ -1623,6 +1631,7 @@ int main(int args, char* argv[]){
                  return -1;
                 }
           }
+	  else if(strcmp(argv[i],"-d")==0) c_debug=1;
 	  else if(strcmp(argv[i],"-ssl")==0) use_ssl=1;
 	  else if(strcmp(argv[i],"-tls")==0) use_tls=1;
 	  else if(strcmp(argv[i],"-i")==0) dump_c=1;

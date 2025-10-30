@@ -31,29 +31,29 @@ echo "************************************"
 
 if [[ $1 == "" ]];
 then
-$CORNELIA_HOME/bin/cornelia_d -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d $2 -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 if [[ $1 == "http" ]];
 then
-$CORNELIA_HOME/bin/cornelia_d -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d $2 -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 if [[ $1 == "ssl" ]];
 then
-$CORNELIA_HOME/bin/cornelia_d -ssl -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d -ssl $2 -c $2 $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 if [[ $1 == "tls" ]];
 then
-$CORNELIA_HOME/bin/cornelia_d -tls -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d -tls $2 -c $2 $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 if [[ $1 == "all" ]];
 then
-$CORNELIA_HOME/bin/cornelia_d -http -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
-$CORNELIA_HOME/bin/cornelia_d -ssl -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
-$CORNELIA_HOME/bin/cornelia_d -tls -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d -http -c $2 $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d -ssl -c $2 $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d -tls -c $2 $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 
