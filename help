@@ -6,7 +6,7 @@ echo ""
 echo "Cornelia Web Server (c) CrazedoutSoft 2022"
 echo ""
 
-FILE=$CORNELIA_HOME/bin/cornelia
+FILE=$CORNELIA_HOME/bin/cornelia_d
 if test -f "$FILE"; then
     echo ""
 else
