@@ -211,8 +211,8 @@ int   socket_write(const http_request* request, const char* buffer, int len);
 int   exec_request(SOCKET sockfd, char* clientIP, void* cSSL);
 void  check_conf(int use_ssl, int use_tls);
 int   handle_proxy(SOCKET sockfd, http_request* request);
-int proxy_connect(char* clientIP, int port);
-void domain_to_ip(char* dest, const char* domain);
+int   proxy_connect(char* clientIP, int port);
+void  domain_to_ip(char* dest, const char* domain);
 user_endpoint* get_user_endpoint(char* argstr);
 virtual_host* get_virtual_host(char* host);
 

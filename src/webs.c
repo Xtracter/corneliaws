@@ -135,6 +135,113 @@ void init_server() {
 
 }
 
+void domain_to_ip(char* dest, const char* domain){
+
+        struct hostent *host_info;
+        struct in_addr *address;
+
+        host_info = gethostbyname(domain);
+                address = (struct in_addr *) (host_info->h_addr_list[0]);
+        strcpy(dest, inet_ntoa(*address));
+}
+
+int proxy_connect(char* clientIP, int port){
+
+    int status, client_fd;
+    struct sockaddr_in serv_addr;
+
+    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("\n Socket creation error \n");
+        return -1;
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, clientIP, &serv_addr.sin_addr)
+        <= 0) {
+        printf(
+            "\nInvalid address/ Address not supported \n");
+        return -1;
+    }
+
+    if ((status
+         = connect(client_fd, (struct sockaddr*)&serv_addr,
+                   sizeof(serv_addr)))
+        < 0) {
+        printf("\nConnection Failed \n");
+        return -1;
+    }
+
+    return client_fd;
+}
+#define BUFF_SIZE 5000
+
+int handle_proxy(SOCKET sockfd, http_request* request){
+
+        SOCKET clientfd;
+        char* tok;
+        char buffer[BUFF_SIZE];
+        char header[1024];
+        char rem_host[256];
+        int rem_port=0,r,n;
+	char proxy_host[256];
+
+        memset(buffer,0,BUFF_SIZE);
+        memset(header,0,1024);
+
+        if(c_debug) printf("[handle_proxy]\n");
+
+        strcpy(buffer,get_header(request,"Host="));
+        tok = strtok(buffer,":");
+        if(tok!=NULL){
+                strcpy(rem_host,tok);
+                rem_port=atoi(strtok(NULL,":"));
+        }else return -1;
+
+        n=0;
+        memset(buffer,0,BUFF_SIZE);
+        while(n<64){
+                if(serv_conf.v_proxys[n]==NULL) break;
+                if(strcmp(rem_host,serv_conf.v_proxys[n]->host)==0 ||
+                        strcmp("all", serv_conf.v_proxys[n]->host)==0) {
+                        domain_to_ip(buffer,serv_conf.v_proxys[n]->proxy_host);
+                        rem_port = serv_conf.v_proxys[n]->proxy_port;
+			strcpy(proxy_host, serv_conf.v_proxys[n]->proxy_host);
+                        break;
+                }
+                n++;
+        }
+
+        if(strlen(buffer)==0) return -1;
+
+        if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
+	strcat(request->request,"\n");
+        send(clientfd,request->request,strlen(request->request),0);
+	if(c_debug) printf("\n");
+        for(int i=0;i<request->headers_len; i++){
+                memset(buffer,0,BUFF_SIZE);
+		if(strstr(request->headers[i],"Connection=")!=NULL){
+                  sprintf(buffer,"Connection: close\n");
+		}else if(strstr(request->headers[i],"Host=")!=NULL){
+                  sprintf(buffer,"Host: %s:%d\n", proxy_host,rem_port);
+		}else{
+                  sprintf(buffer,"%s\n",str_replace(request->headers[i],"=",": "));
+		}
+		if(c_debug) printf("%s", buffer);
+                send(clientfd,buffer,strlen(buffer),0);
+        }
+        send(clientfd,"\n\n",2,0);
+        send(clientfd,header,strlen(header),0);
+        while((r=read(clientfd,buffer,256))>0){
+                send(sockfd,buffer,r,0);
+        }
+
+        close(clientfd);
+
+        return 0;
+}
+
 int get_file_size(const http_request* request){
 
         FILE *fd;
@@ -323,8 +430,7 @@ void list_dir (const char* dir, char* buffer) {
    char* reg = (char*)malloc(MAX_ALLOC);
 
    memset(tmp, 0, 1024);
-   memset(fold,0, MAX_ALLOC);
-   memset(reg, 0, MAX_ALLOC);
+   memset(fold,0, MAX_ALLOC);   memset(reg, 0, MAX_ALLOC);
 
    dp = opendir (dir);
    if (dp != NULL){
@@ -1120,6 +1226,8 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	r=readline(&request, buffer, 2048);
 	if(r<1) return CONN_CLOSE;
 
+	strcpy(request.request,buffer);
+
 	if(c_debug) printf("[readline]\n");
 
 	if(strlen(&serv_conf.logfile[0])>0){
@@ -1153,6 +1261,13 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	}
 
 	if(c_debug) printf("[exit read_headers]\n");
+
+
+	// Handle proxy relay.
+	if(serv_conf.v_proxys[0]!=NULL){
+	  handle_proxy(sockfd,&request);
+	  return CONN_CLOSE;
+	}
 
 	// Set virtual path if Host header matches.
 	if((host=get_header(&request,"Host="))!=NULL){
@@ -1365,6 +1480,7 @@ void usage(){
 	printf("-ssl\t<server_ssl_port>\n");
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
+	printf("-d \tdebug mode\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\"my\":\"content\"}%%application/json\n");
 	printf("                       [-uep:/myendpoint%%file:myjson.js%%application/json\n");
 	printf("\tContent-Type can default to 'application/json' if omitted.\n");
@@ -1512,6 +1628,7 @@ int main(int args, char* argv[]){
                  return -1;
                 }
           }
+	  else if(strcmp(argv[i],"-d")==0) c_debug=1;
 	  else if(strcmp(argv[i],"-ssl")==0) use_ssl=1;
 	  else if(strcmp(argv[i],"-tls")==0) use_tls=1;
 	  else if(strcmp(argv[i],"-i")==0) dump_c=1;
