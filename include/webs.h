@@ -112,6 +112,7 @@ typedef struct content_type_t {
 typedef struct http_request_t {
 
         SOCKET sockfd;
+	char  request[2048];
         char  method[12];
         char  file[256];
         char  path[2048];

@@ -196,6 +196,7 @@ int handle_proxy(SOCKET sockfd, http_request* request){
 	char header[1024];
 	char rem_host[256];
 	int rem_port=0,r,n;
+	char head_host[256];
 
 	memset(buffer,0,BUFF_SIZE);
 	memset(header,0,1024);
@@ -217,6 +218,7 @@ int handle_proxy(SOCKET sockfd, http_request* request){
 			strcmp("all", serv_conf.v_proxys[n]->host)==0) {
 			domain_to_ip(buffer,serv_conf.v_proxys[n]->proxy_host);
 			rem_port = serv_conf.v_proxys[n]->proxy_port;
+			strcpy(head_host, serv_conf.v_proxys[n]->proxy_host);
 			break;
 		}
 		n++;
@@ -224,13 +226,22 @@ int handle_proxy(SOCKET sockfd, http_request* request){
 
 	if(strlen(buffer)==0) return -1;
 
+	printf("%s:%d\n",buffer,rem_port);
 	if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
-	sprintf(buffer,"%s %s%s %s\n",request->method,request->path, request->query_string,request->httpv);
-	printf("buffer: %s %s\n", buffer, request->query_string);
+	strcpy(buffer,request->request);
+	strcat(buffer,"\n");
+	printf("%s\n",buffer);
 	send(clientfd,buffer,strlen(buffer),0);
 	for(int i=0;i<request->headers_len; i++){
 		memset(buffer,0,BUFF_SIZE);
-		sprintf(buffer,"%s\n",request->headers[i]);
+		if(strstr(request->headers[i],"Connection=")!=NULL){
+			sprintf(buffer,"Connection: close\n");
+		}else if(strstr(request->headers[i],"Host=")!=NULL){
+			sprintf(buffer,"Host: %s:%d\n", head_host,rem_port);
+		}else{
+			sprintf(buffer,"%s\n",str_replace(request->headers[i],"=",": "));
+		}
+		printf("%s",buffer);
 		send(clientfd,buffer,strlen(buffer),0);
 	}
 	send(clientfd,"\n\n",2,0);
@@ -239,7 +250,7 @@ int handle_proxy(SOCKET sockfd, http_request* request){
 		send(sockfd,buffer,r,0);
 	}
 
-	close(clientfd);
+	shutdown(clientfd,SHUT_RDWR);
 
 	return 0;
 }
@@ -1228,6 +1239,8 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 
 	r=readline(&request, buffer, 2048);
 	if(r<1) return CONN_CLOSE;
+
+	strcpy(request.request,buffer);
 
 	if(c_debug) printf("[readline]\n");
 
