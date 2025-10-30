@@ -94,6 +94,7 @@ Proxy relaying:</br>
 By setting config [proxy_targets] Cornlia acts as a proxy relaying all trafik to a different target.</br>
 host=new_host:port (host=host in browser address)</br>
 By setting host to 'all'. All requests will be forwarded to new_host:port.
+The target host must be plain HTTP.
 </p>
 
 OpenSSL:<br/>
@@ -108,5 +109,4 @@ PHP is handled by php-cgi and *.jgazm by jGazm.<br>
 Cornelia also includes a home brewed simple version of JSP <a href="JSPZ.md">JSPZ.md</a>.
 <p/>
 
-
- Good Luck / Fredrik. 
+Good Luck / Fredrik. 
