@@ -279,8 +279,8 @@ void read_proxy_targets(FILE* fd, server_conf *serv){
 		if(buffer[0]=='#') continue;
 		ptr=strtok(buffer,"=");
 		if(ptr!=NULL){
-			serv->v_proxys[n]=(proxy_targets*)malloc(sizeof(proxy_targets));
-			memset(serv->v_proxys[n],0,sizeof(proxy_targets));
+			serv->v_proxys[n]=(proxy_target*)malloc(sizeof(proxy_target));
+			memset(serv->v_proxys[n],0,sizeof(proxy_target));
 			strcpy(serv->v_proxys[n]->host,ptr);
 			ptr=strtok(NULL,":");
 			if(ptr!=NULL){

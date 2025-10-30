@@ -64,7 +64,7 @@ typedef struct proxy_targets_t {
 	char proxy_host[256];
 	int proxy_port;
 
-} proxy_targets;
+} proxy_target;
 
 typedef struct user_endpoint_t {
 
@@ -162,7 +162,7 @@ typedef struct server_conf_t {
 	char keycrt[1024];
 	int  max_keep_alive_requests;
 	int  keep_alive_timeout;
-	proxy_targets* v_proxys[MAX_PROXY_TARGETS];
+	proxy_target* v_proxys[MAX_PROXY_TARGETS];
 	virtual_host* v_hosts[MAX_VIRTUAL_HOSTS];
 	virtual_files* v_files[MAX_VIRTUAL_FILE];
 	unsigned int max_post_data;

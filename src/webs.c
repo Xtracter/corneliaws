@@ -68,7 +68,7 @@ char  conf_file[1024] = "conf/corny.conf";
 char  cip[16];
 void dump_request(http_request* r);
 user_endpoint* uep = NULL;
-
+proxy_target* user_proxy_target = NULL;
 
 void usleep(unsigned long);
 
@@ -1586,11 +1586,26 @@ user_endpoint* get_user_endpoint(char* argstr){
  return uep;
 }
 
+void set_user_proxy(char* cmd){
+
+	char* ptr = strtok(cmd,"=");
+	if(ptr!=NULL){
+	  user_proxy_target = (proxy_target*)malloc(sizeof(proxy_target));
+	  strcpy(user_proxy_target->host,ptr);
+	  ptr=strtok(NULL,":");
+	  if(ptr!=NULL){
+	    strcpy(user_proxy_target->proxy_host,ptr);
+	    user_proxy_target->proxy_port=atoi(strtok(NULL,":"));
+	  }
+	}
+
+}
+
 void usage(){
 
 	printf("\nCornelia Web Server (c) CrazedoutSoft 2022\n\n");
-	printf("usage:\tcornelia_d [OPTION]\n");
-	printf("example:cornelia -c myconf.conf -p 8080\n\n");
+	printf("usage: cornelia_d [OPTIONW]\n");
+	printf("example: cornelia -tls -c myconf.conf -p 8080\n\n");
 	printf("-http\tHTTP (Default)\n");
 	printf("-ssl\tHTTP/SSL\n");
 	printf("-tls\tHTTP/TLS\n");
@@ -1600,9 +1615,10 @@ void usage(){
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
 	printf("-d \tdebug mode\n");
+	printf("-proxy:host=relay_host:port\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"name\\\":\\\"value\\\"}%%application/json\n");
-	printf("                       [-uep:/myendpoint%%file:myjson.js%%application/json\n");
-	printf("\tContent-Type can default to 'application/json' if omitted.\n");
+	printf("                        [-uep:/myendpoint%%file:myjson.js%%application/json\n");
+	printf("                        Content-Type defaults to 'application/json' if omitted.\n");
 	printf("--help prints this message\n\n");
 
 }
@@ -1668,6 +1684,9 @@ int main(int args, char* argv[]){
 	  else if(strstr(argv[i],"-uep")!=NULL){
 	    uep = get_user_endpoint(strstr(argv[i],"-uep"));
 	  }
+	  else if(strstr(argv[i],"-proxy")!=NULL){
+	    set_user_proxy(&argv[i][7]);
+	  }
 	  else if(strcmp(argv[i],"--help")==0) {
 		usage();
 		return 0;
@@ -1682,6 +1701,19 @@ int main(int args, char* argv[]){
 	if(c_debug) printf("Debug mode is on\n");
 
 	if(init_conf(&conf_file[0], &serv_conf)>-1){
+
+	  // Add User proxy target if exists.
+	  if(user_proxy_target!=NULL){
+	    int n=0;
+	    while(serv_conf.v_proxys[n]!=NULL){
+	      n++;
+	    }
+	    serv_conf.v_proxys[n] = (proxy_target*)malloc(sizeof(proxy_target));
+	    memcpy(serv_conf.v_proxys[n],user_proxy_target,sizeof(proxy_target));
+	    serv_conf.v_proxys[n+1]=NULL;
+	  }
+
+
   	  if(user_port>0) serv_conf.port=user_port;
   	  if(user_ssl_port>0) serv_conf.ssl_port=user_ssl_port;
   	  if(user_tsl_port>0) serv_conf.tls_port=user_tsl_port;
@@ -1708,6 +1740,7 @@ int main(int args, char* argv[]){
           }
 	}
 
+	if(user_proxy_target!=NULL) free(user_proxy_target);
 	free(bad_request);
 	free(internal_server_error);
 	free(forbidden);
