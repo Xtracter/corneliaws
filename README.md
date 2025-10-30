@@ -90,6 +90,12 @@ In conf/corny:<br>
 ><b>http://localhost:8080/myendpoint</b> will respond with supplied response (or from file) with <i>Content-Type</i> or application/json if omitted.
 <p>
 
+Proxy relaying:</br>
+By setting config [proxy_targets] Cornlia can akt as a proxy relaying all trafik to a different target.</br>
+host=new_host:port</br>
+By setting host to 'all'. All requests will be forwarded to new_host:port.
+</p>
+
 OpenSSL:<br/>
 If you can't build Cornelia with the OpenSSL headers and libs provided you <br/>
 must compile your own OpenSLL libs and replace them in dir openssl<br/>
