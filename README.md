@@ -91,8 +91,8 @@ In conf/corny:<br>
 <p>
 
 Proxy relaying:</br>
-By setting config [proxy_targets] Cornlia can akt as a proxy relaying all trafik to a different target.</br>
-host=new_host:port</br>
+By setting config [proxy_targets] Cornlia acts as a proxy relaying all trafik to a different target.</br>
+host=new_host:port (host=host in browser address)</br>
 By setting host to 'all'. All requests will be forwarded to new_host:port.
 </p>
 
@@ -107,16 +107,6 @@ Cornelia handles all default CGI such as plain c binaries, shell script, perl an
 PHP is handled by php-cgi and *.jgazm by jGazm.<br>
 Cornelia also includes a home brewed simple version of JSP <a href="JSPZ.md">JSPZ.md</a>.
 <p/>
-<p/>
-jGazm:<br/>
- 1) Java JDK 1.7 or above must be installed. Some JRE's may work but no guarantee.<br/>
- 2) Run ./setup_linux (you may have to chmod 755 on "setup_linux")<p/>
- 3) For 'Online jGazm' to work $CORNELIA_HOME/jgazm needs to be in PATH.<p/>
-
->cd jgazm<br/>
->./setup_linux</p>
-
- 3) JAVA_HOME must be set to current JVM 1.7 (or above) in file jgazm. Setup script will try to get it right but may fail.<p/>
 
 
  Good Luck / Fredrik. 
