@@ -1615,7 +1615,7 @@ void usage(){
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
 	printf("-d \tdebug mode\n");
-	printf("-proxy:host=relay_host:port\n");
+	printf("-proxy\tset up proxy target [-proxy:host=relay_host:port]\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"name\\\":\\\"value\\\"}%%application/json\n");
 	printf("                        [-uep:/myendpoint%%file:myjson.js%%application/json\n");
 	printf("                        Content-Type defaults to 'application/json' if omitted.\n");

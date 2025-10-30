@@ -1,0 +1,23 @@
+#!/bin/bash
+
+clear
+
+echo ""
+echo "Cornelia Web Server (c) CrazedoutSoft 2022"
+echo ""
+
+FILE=$CORNELIA_HOME/bin/cornelia
+if test -f "$FILE"; then
+    echo ""
+else
+    echo "$FILE does not exist."
+    echo ""
+    echo "Run 'build_all' or 'make'."
+    echo ""
+    echo "You need gcc compiler and 'make' to build Cornelia."
+    echo ""
+    exit
+fi
+
+bin/cornelia_d --help
+
