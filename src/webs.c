@@ -970,7 +970,7 @@ int handle_virtual_files(http_request* request){
 	sprintf(tmp,"%s%s", &request->path[0],&request->file[0]);
 	if(uep!=NULL && strcmp(tmp,uep->endpoint)==0){
 	  if(c_debug) printf("[start uep]\n");
-	  printf("eup:%s %s\n", tmp, uep->endpoint);
+	  if(c_debug) printf("eup:%s %s\n", tmp, uep->endpoint);
 	  socket_write(request,"HTTP/1.1 200 OK\n",16);
 	  socket_write(request,"Server: Cornelia\n",17);
 	  socket_write(request,"Connection: close\n",18);
@@ -1498,27 +1498,6 @@ char* encode_url(unsigned char* url, char* url_enc){
 
 int setenv(const char *name, const char *value, int overwrite);
 
-void usage(){
-
-	printf("\nCornelia Web Server (c) CrazedoutSoft 2022\n\n");
-	printf("usage:\tcornelia_d [OPTION]\n");
-	printf("example:cornelia -c myconf.conf -p 8080\n\n");
-	printf("-http\tHTTP (Default)\n");
-	printf("-ssl\tHTTP/SSL\n");
-	printf("-tls\tHTTP/TLS\n");
-	printf("-c\t<conf_file>\n");
-	printf("-p\t<server_port>\n");
-	printf("-ssl\t<server_ssl_port>\n");
-	printf("-tsl\t<server_tsl_port>\n");
-	printf("-i \tprints config\n");
-	printf("-d \tdebug mode\n");
-	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\"my\":\"content\"}%%application/json\n");
-	printf("                       [-uep:/myendpoint%%file:myjson.js%%application/json\n");
-	printf("\tContent-Type can default to 'application/json' if omitted.\n");
-	printf("--help prints this message\n\n");
-
-}
-
 void check_conf(int use_ssl, int use_tls){
 
 
@@ -1583,6 +1562,7 @@ user_endpoint* get_user_endpoint(char* argstr){
       }else {
         uep->response = (char*)malloc(strlen(token));
 	strcpy(uep->response, token);
+	printf("token: %s\n", token);
       }
     }else if(n==2){
       uep->content_type = (char*)malloc(strlen(token));
@@ -1593,7 +1573,7 @@ user_endpoint* get_user_endpoint(char* argstr){
 
   if(uep->endpoint==NULL || uep->response==NULL){
         printf("User enpoint must have at least 'enpoint' and 'response' defined.\n");
-        printf("Format: -uep:/myendpoint\%%{\"name\":\"value\"}\%%application/json\n");
+        printf("Format: -uep:/myendpoint\%%{\\\"name\\\":\\\"value\\\"}\%%application/json\n");
         printf("Format: -uep:/myendpoint\%%file:myjson.js\%%application/json\n");
         printf("Supplied: -uep:%s %s %s\n", uep->endpoint, uep->response, uep->content_type);
         printf("No correct eup defined\n");
@@ -1604,6 +1584,27 @@ user_endpoint* get_user_endpoint(char* argstr){
   free(arg);
 
  return uep;
+}
+
+void usage(){
+
+	printf("\nCornelia Web Server (c) CrazedoutSoft 2022\n\n");
+	printf("usage:\tcornelia_d [OPTION]\n");
+	printf("example:cornelia -c myconf.conf -p 8080\n\n");
+	printf("-http\tHTTP (Default)\n");
+	printf("-ssl\tHTTP/SSL\n");
+	printf("-tls\tHTTP/TLS\n");
+	printf("-c\t<conf_file>\n");
+	printf("-p\t<server_port>\n");
+	printf("-ssl\t<server_ssl_port>\n");
+	printf("-tsl\t<server_tsl_port>\n");
+	printf("-i \tprints config\n");
+	printf("-d \tdebug mode\n");
+	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"my\\\":\\\"content\\\"}%%application/json\n");
+	printf("                       [-uep:/myendpoint%%file:myjson.js%%application/json\n");
+	printf("\tContent-Type can default to 'application/json' if omitted.\n");
+	printf("--help prints this message\n\n");
+
 }
 
 
@@ -1678,6 +1679,7 @@ int main(int args, char* argv[]){
 
 	memset(&serv_conf,0,sizeof(server_conf));
 	memset(&a_conf,0,sizeof(auth_conf));
+	if(c_debug) printf("Debug mode is on\n");
 
 	if(init_conf(&conf_file[0], &serv_conf)>-1){
   	  if(user_port>0) serv_conf.port=user_port;
