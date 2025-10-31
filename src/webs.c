@@ -142,7 +142,7 @@ void domain_to_ip(char* dest, const char* domain){
         struct in_addr *address;
 
         host_info = gethostbyname(domain);
-                address = (struct in_addr *) (host_info->h_addr_list[0]);
+        address = (struct in_addr *) (host_info->h_addr_list[0]);
         strcpy(dest, inet_ntoa(*address));
 }
 
@@ -213,7 +213,7 @@ int handle_proxy(SOCKET sockfd, http_request* request){
                 }
                 n++;
         }
-	if(c_debug) printf("%s %d\n", buffer, (int)strlen(buffer));
+	if(c_debug) printf("Proxy: %s %d\n", buffer, (int)strlen(buffer));
         if(strlen(buffer)==0) return -2;
 
         if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
@@ -226,7 +226,11 @@ int handle_proxy(SOCKET sockfd, http_request* request){
 		if(strstr(request->headers[i],"Connection=")!=NULL){
                   sprintf(buffer,"Connection: close\n");
 		}else if(strstr(request->headers[i],"Host=")!=NULL){
-                  sprintf(buffer,"Host: %s:%d\n", proxy_host,rem_port);
+		  if(rem_port!=80){
+                    sprintf(buffer,"Host: %s:%d\n", proxy_host,rem_port);
+		  }else{
+                    sprintf(buffer,"Host: %s\n", proxy_host);
+		  }
 		}else{
                   sprintf(buffer,"%s\n",str_replace(request->headers[i],"=",": "));
 		}
@@ -237,7 +241,7 @@ int handle_proxy(SOCKET sockfd, http_request* request){
         send(clientfd,"\n\n",2,0);
         //proxy_write(clientfd,header,strlen(header),request->cSSL);
         while((r=read(clientfd,buffer,256))>0){
-                proxy_write(sockfd,buffer,r,request->cSSL);
+           r=proxy_write(sockfd,buffer,r,request->cSSL);
         }
 
         close(clientfd);
