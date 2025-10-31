@@ -67,7 +67,7 @@ char* ACAOrigin;
 char  conf_file[1024] = "conf/corny.conf";
 char  cip[16];
 void dump_request(http_request* r);
-user_endpoint* uep = NULL;
+user_endpoint* user_uep = NULL;
 proxy_target* user_proxy_target = NULL;
 
 void usleep(unsigned long);
@@ -965,12 +965,12 @@ int handle_virtual_files(http_request* request){
 	 n++;
 	}
 
-	if(c_debug) printf("[start uep %d]\n", uep==NULL);
+	if(c_debug) printf("[start uep %d]\n", user_uep==NULL);
 	tmp = (char*)malloc(strlen(&request->path[0])+strlen(&request->file[0])+2);
 	sprintf(tmp,"%s%s", &request->path[0],&request->file[0]);
-	if(uep!=NULL && strcmp(tmp,uep->endpoint)==0){
+	if(user_uep!=NULL && strcmp(tmp,user_uep->endpoint)==0){
 	  if(c_debug) printf("[start uep]\n");
-	  if(c_debug) printf("eup:%s %s\n", tmp, uep->endpoint);
+	  if(c_debug) printf("eup:%s %s\n", tmp, user_uep->endpoint);
 	  socket_write(request,"HTTP/1.1 200 OK\n",16);
 	  socket_write(request,"Server: Cornelia\n",17);
 	  socket_write(request,"Connection: close\n",18);
@@ -981,17 +981,17 @@ int handle_virtual_files(http_request* request){
 	  }
 
 	  tmp = (char*)realloc(tmp,255);
-	  if(uep->content_type!=NULL){
-	   sprintf(tmp,"Content-Type: %s\n", uep->content_type);
+	  if(user_uep->content_type!=NULL){
+	   sprintf(tmp,"Content-Type: %s\n", user_uep->content_type);
 	  }else sprintf(tmp,"Content-Type: application/json\n");
 	  socket_write(request, tmp, strlen(tmp));
 
-	  if(uep->response!=NULL) {
+	  if(user_uep->response!=NULL) {
 	    tmp = realloc(tmp,128);
-	    sprintf(tmp,"Content-Length: %d\n\n", (int)strlen(uep->response));
+	    sprintf(tmp,"Content-Length: %d\n\n", (int)strlen(user_uep->response));
 	    socket_write(request, tmp, strlen(tmp));
-	    tmp = realloc(tmp,strlen(uep->response)+2);
- 	    sprintf(tmp,"%s", uep->response);
+	    tmp = realloc(tmp,strlen(user_uep->response)+2);
+ 	    sprintf(tmp,"%s", user_uep->response);
 	    socket_write(request, tmp, strlen(tmp));
 	  }
  	 res=1;
@@ -1524,7 +1524,7 @@ void check_conf(int use_ssl, int use_tls){
 
 }
 
-
+/*
 user_endpoint* get_user_endpoint(char* argstr){
 
   int n = 0;
@@ -1585,7 +1585,7 @@ user_endpoint* get_user_endpoint(char* argstr){
 
  return uep;
 }
-
+*/
 void set_user_proxy(char* cmd){
 
 	char* ptr = strtok(cmd,"=");
@@ -1682,7 +1682,7 @@ int main(int args, char* argv[]){
 	  else if(strcmp(argv[i],"-i")==0) dump_c=1;
 	  else if(strcmp(argv[i],"-d")==0) c_debug=1;
 	  else if(strstr(argv[i],"-uep")!=NULL){
-	    uep = get_user_endpoint(strstr(argv[i],"-uep"));
+	    user_uep = get_user_endpoint(strstr(argv[i],"-uep"));
 	  }
 	  else if(strstr(argv[i],"-proxy")!=NULL){
 	    set_user_proxy(&argv[i][7]);

@@ -27,11 +27,12 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #define SERVER_CONF 		"[server_conf]"
 #define AUTH_CONF   		"[auth_conf]"
-#define CONTENT_TYPE_CONF   "[content_type_conf]"
+#define CONTENT_TYPE_CONF   	"[content_type_conf]"
 #define CGI_BIN_CONF		"[cgi_exec_conf]"
-#define VHOSTS_CONF			"[virtual_hosts]"
+#define VHOSTS_CONF		"[virtual_hosts]"
 #define VHOSTS_FILES		"[virtual_files]"
 #define VPROXYS_CONF		"[proxy_targets]"
+#define UEP_CONF		"[endpoints]"
 
 void print_server_conf(server_conf* serv){
 
@@ -268,6 +269,67 @@ void read_auth_conf(FILE* fd, server_conf *serv){
     free(buffer);
 }
 
+user_endpoint* get_user_endpoint(char* argstr){
+
+  int n = 0;
+  char* token;
+  char* ptr;
+  char* arg = (char*)malloc(strlen(argstr)+1);
+  FILE* fd;
+  int r=0;
+  long fd_len=0;
+  strcpy(arg, argstr);
+
+  user_endpoint* uep = (user_endpoint*)malloc(sizeof(user_endpoint));
+  memset(uep,0,sizeof(user_endpoint));
+
+  token = strtok(arg, ":");
+
+   while((token = strtok(NULL, "%"))!=NULL){
+    if(n==0){
+      uep->endpoint = (char*)malloc(strlen(token));
+      strcpy(uep->endpoint, token);
+    }else if(n==1){
+      if((ptr=strstr(token,"file:"))!=NULL){
+        if((fd=fopen(ptr+5,"r"))!=NULL){
+          fseek(fd,0,SEEK_END);
+          fd_len=ftell(fd);
+          fseek(fd,0,SEEK_SET);
+          ptr = (char*)malloc(fd_len+1);
+          r=fread(ptr,fd_len,1,fd);
+          (void)(r);
+          fclose(fd);
+          uep->response = (char*)malloc(strlen(ptr));
+          strcpy(uep->response, ptr);
+          free(ptr);
+        }else fprintf(stderr,"Bad uep file\n");
+      }else {
+        uep->response = (char*)malloc(strlen(token));
+        strcpy(uep->response, token);
+        printf("token: %s\n", token);
+      }
+    }else if(n==2){
+      uep->content_type = (char*)malloc(strlen(token));
+      strcpy(uep->content_type, token);
+    }
+   n++;
+  }
+
+  if(uep->endpoint==NULL || uep->response==NULL){
+        printf("User enpoint must have at least 'enpoint' and 'response' defined.\n");
+        printf("Format: -uep:/myendpoint\%%{\\\"name\\\":\\\"value\\\"}\%%application/json\n");
+        printf("Format: -uep:/myendpoint\%%file:myjson.js\%%application/json\n");
+        printf("Supplied: -uep:%s %s %s\n", uep->endpoint, uep->response, uep->content_type);
+        printf("No correct eup defined\n");
+  }else{
+        printf("Listening on endpoint:%s, reply %s\n", uep->endpoint, uep->content_type!=NULL?uep->content_type:"application/json");
+  }
+
+  free(arg);
+
+ return uep;
+}
+
 void read_proxy_targets(FILE* fd, server_conf *serv){
 
     char* buffer = (char*)malloc(1024);
@@ -323,6 +385,7 @@ void read_content_types(FILE* fd, server_conf *serv){
 
     free(buffer);
 }
+
 
 void read_cgi_bin(FILE* fd, server_conf* serv){
 

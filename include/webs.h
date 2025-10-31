@@ -35,6 +35,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MAX_CONTENT_TYPES	64
 #define MAX_VIRTUAL_HOSTS	64
 #define MAX_PROXY_TARGETS	64
+#define MAX_UEP			16
 #define MAX_VIRTUAL_PATH	256
 #define MAX_VIRTUAL_FILE	256
 #define MAX_HTTP_HEADERS	256
@@ -165,6 +166,7 @@ typedef struct server_conf_t {
 	proxy_target* v_proxys[MAX_PROXY_TARGETS];
 	virtual_host* v_hosts[MAX_VIRTUAL_HOSTS];
 	virtual_files* v_files[MAX_VIRTUAL_FILE];
+	user_endpoint* uep[MAX_UEP];
 	unsigned int max_post_data;
 
 } server_conf;
