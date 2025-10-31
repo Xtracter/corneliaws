@@ -56,6 +56,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <poll.h>
 #include <time.h>
 #include <crypt.h>
+#include <sys/stat.h>
 
 void handle_request(SOCKET sockfd, char* clientIP, void* cSSL);
 
@@ -217,6 +218,7 @@ void  check_conf(int use_ssl, int use_tls);
 int   handle_proxy(SOCKET sockfd, http_request* request);
 int   proxy_connect(char* clientIP, int port);
 void  domain_to_ip(char* dest, const char* domain);
+int   is_regular_file(const server_conf* serv, const http_request* request);
 user_endpoint* get_user_endpoint(char* argstr);
 virtual_host* get_virtual_host(char* host);
 

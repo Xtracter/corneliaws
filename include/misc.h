@@ -23,7 +23,6 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _CORNY_MISC_
 
 typedef unsigned char BYTE;
-
 char* clipend(char* str);
 char* trimpath(char* str);
 int   ends_with(char* string, char* end);

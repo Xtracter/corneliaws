@@ -31,7 +31,7 @@ echo "************************************"
 
 if [[ $1 == "" ]];
 then
-$CORNELIA_HOME/bin/cornelia_d -d $2 -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d $2 -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 if [[ $1 == "http" ]];

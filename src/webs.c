@@ -86,7 +86,7 @@ void init_server() {
 
         sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (sockfd == -1) {
-	  perror("Fatal: Socket creation failed.\n");
+	  printf("Fatal: Socket creation failed.\n");
 	  exit(-1);
         }
         memset(&servaddr, 0, sizeof(servaddr));
@@ -95,12 +95,12 @@ void init_server() {
         servaddr.sin_port = htons(port);
 
         if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
-	  perror("Fatal: Socket bind failed.\n\nTry bin/restart.sh\n\n");
+	  printf("\nFatal: Socket bind failed.\nIs server already running?\nTry bin/restart.sh\n\n");
 	  exit(-1);
         }
 
         if ((listen(sockfd, 5)) != 0) {
-	  perror("Fatal: sock listen failed.\n\nTry bin/restart.sh\n\n");
+	  printf("Fatal: sock listen failed.\n\nTry bin/restart.sh\n\n");
 	  exit(-1);
         }
 
@@ -550,10 +550,11 @@ int find_default_page(http_request* request){
 	int found=0;
 	char* tmp = (char*)malloc(strlen(&serv_conf.default_page[0])+1);
 
+
 	strcpy(tmp,&serv_conf.default_page[0]);
 	ptr=strtok(tmp,",");
 	if(ptr!=NULL){
-	 sprintf(fi, "%s/%s%s%s", &serv_conf.workdir[0], &request->virtual_path[0], &request->path[0], ptr);
+ 	  sprintf(fi, "%s/%s%s%s", &serv_conf.workdir[0], &request->virtual_path[0], &request->path[0], ptr);
 	  if(file_exists(fi)) {
 	   strcpy(&request->file[0],ptr);
 	   found=1;
@@ -912,9 +913,9 @@ void doGetPost(http_request *request){
 	  return;
 	}
 
+
   	response.content_length = get_file_size(request);
 	strcpy(&response.content_type[0],get_content_type(&request->file[0], &ext[0]));
-
 	//dump_request(request);
 
 	if(c_debug) printf("[content-length read]\n");
@@ -936,7 +937,7 @@ void doGetPost(http_request *request){
 	    socket_write(request,"\r\n",2);
 	    if(write_plain_file(&response, response.content_length,
 	        &request->path[0], &request->file[0])==-1){
-	      send_bad_request(&response, D_404_NOT_FOUND);
+    		send_bad_request(&response, D_404_NOT_FOUND);
 	    }
 	  }
 	}
@@ -1013,7 +1014,6 @@ int parse_http(char* buffer, http_request* request){
 	ptr=strtok(&buffer[0]," ");
 	if(ptr==NULL) return -1;
 	strcpy(&request->method[0],ptr);
-
 
 	ptr=strtok(NULL," ");
 	if(ptr==NULL) return -1;
@@ -1272,10 +1272,15 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 
 	int parse_h = parse_http(buffer,&request);
 
-	if(parse_h==1) {
-         free(buffer);
-         free(tmp);
-	 return ret;
+	// Handle directoery request without trailing '/'.
+	if(c_debug) printf("[handle dir request]\n");
+	if(!is_regular_file(&serv_conf, &request)){
+	  char* tmp = (char*)malloc(MAX_ALLOC);
+	  sprintf(tmp,"%s%s/",&request.path[0],&request.file[0]);
+	  request.file[0]='\0';
+	  strcpy(request.path,tmp);
+	  free(tmp);
+	  parse_h=-1;
 	}
 
 	if(c_debug) printf("[exit parse_http]\n");
@@ -1356,6 +1361,19 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	free(tmp);
 
  return ret;
+}
+
+int is_regular_file(const server_conf* serv, const http_request* request) {
+
+    char* path = (char*)malloc(MAX_ALLOC);
+
+    sprintf(path, "%s/%s%s%s", serv->workdir, request->virtual_path, request->path, request->file);
+
+    struct stat path_stat;
+    stat(path, &path_stat);
+    free(path);
+
+    return S_ISREG(path_stat.st_mode);
 }
 
 void free_request(http_request* r){
