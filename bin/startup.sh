@@ -23,10 +23,10 @@ fi
 export LD_LIBRARY_PATH=$CORNELIA_HOME/openssl
 
 clear
-echo "************************************"
-echo "* Starting Cornelia Web Server     *"
-echo "* (c) CrazedoutSoft 2022 / F.Roos  *"
-echo "************************************"
+echo "***********************************************"
+echo "* Starting Cornelia Web Server                *"
+echo "* (c) CrazedoutSoft 2022 - 2025 Fredrik Roos  *"
+echo "***********************************************"
 
 
 if [[ $1 == "" ]];

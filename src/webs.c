@@ -108,6 +108,7 @@ void init_server() {
         printf("\nCornelia listening on %d [HTTP]\n", serv_conf.port);
 
         while(loop){
+
 	  connfd = accept(sockfd, (SA*)&cli, &len);
 	  int pid = fork();
 	  if(pid>0){

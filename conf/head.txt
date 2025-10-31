@@ -1,4 +1,4 @@
-************************************
-* Building Cornelia Web Server     *
-* (c) CrazedoutSoft 2022 / F.Roos  *
-************************************
+**********************************************
+* Building Cornelia Web Server               *
+* (c) CrazedoutSoft 2022-2025 / Fredrik Roos *
+**********************************************
