@@ -55,6 +55,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 int c_debug = 0;
+int dump_req=0;
 server_conf serv_conf;
 auth_conf   a_conf;
 
@@ -69,6 +70,11 @@ char  cip[16];
 void dump_request(http_request* r);
 user_endpoint* user_uep = NULL;
 proxy_target* user_proxy_target = NULL;
+
+#define CHUNK_SIZE 4096
+
+int write_chunked(int fd, http_request* request, int gzip);
+int accept_encoding(const http_request* request, const char* enc);
 
 void usleep(unsigned long);
 
@@ -643,6 +649,7 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 
         int n = 0;
         int r = 0;
+	int z = 0;
 	char* argv[128];
 
         char *buffer;
@@ -707,9 +714,14 @@ int exec_cgi(http_response* response, const char* exe_ptr){
             sprintf(headb,"HTTP/1.1 200 OK\nConnection: %s\n", &response->request->connection[0]);
 	    n=socket_write(response->request, headb, strlen(headb));
             sprintf(headb,"Transfer-Encoding: chunked\n");
-//            sprintf(headb,"Content-Encoding: gzip\n");
 	    n=socket_write(response->request, headb, strlen(headb));
-	    n=write_chunked(pipefd[0], response->request);
+	    if((z = accept_encoding(response->request,"gzip"))){
+              sprintf(headb,"Content-Encoding: gzip\n");
+  	      n=socket_write(response->request, headb, strlen(headb));
+	    }
+	    n=write_chunked(pipefd[0], response->request,z);
+
+
 	    /*
             while((r=read(pipefd[0], buffer, 1024))){
               //n=socket_write(response->request, buffer, r);
@@ -739,24 +751,23 @@ int exec_cgi(http_response* response, const char* exe_ptr){
  return n;
 }
 
-#define CHUNK_SIZE 2048
 
-int write_chunked(int fd, http_request* request){
+int write_chunked(int fd, http_request* request, int gzip){
 
 
 	int r=0;
 	int n=0;
-	int c=0;
 	char line[64];
 	int len = CHUNK_SIZE;
-	char* buffer = (char*)malloc(len);
-	char* headb = (char*)malloc(len);
-	char* bzip = (char*)malloc(len+256);
+	char buffer[len];
+	char headb[len];
 
 	http_request tmp_request;
 
 	tmp_request.sockfd=fd;
 	tmp_request.cSSL = request->cSSL;
+
+	if(gzip) printf("Zipping\n");
 
 	// Read head;
 	while(1){
@@ -767,18 +778,22 @@ int write_chunked(int fd, http_request* request){
 	}
 
 	while((r=read(fd, buffer, len))){
+	  if(gzip){
+	    r=buf_compress(buffer,r,headb,len);
+	    if(dump_req) printf("gzip:%d\n",r);
+	  }
 	  sprintf(line,"%X\r\n",r);
 	  n=socket_write(request, line, strlen(line));
-          n=socket_write(request, buffer, r);
+          if(gzip) {
+	    n=socket_write(request, headb, r);
+	  }else{
+	    n=socket_write(request, buffer, r);
+          }
   	  n=socket_write(request, "\r\n", 2);
 	}
 	sprintf(line,"%X\r\n",0);
 	n=socket_write(request, line, strlen(line));
 	n=socket_write(request, "\r\n", 2);
-
-	free(bzip);
-	free(buffer);
-	free(headb);
 
   return n;
 }
@@ -808,10 +823,10 @@ int write_plain_file(const http_response* response, int len, char*path, char* fi
 	    socket_write(response->request, tmp, r);
 	    n+=r;
 	  }
-	  if(n!=len) fprintf(stderr,"Bytes read: %d are less than content-length: %d\n", n, len);
+	  if(n!=len) fprintf(stdout,"Bytes read: %d are less than content-length: %d\n", n, len);
 	  fclose(fd);
 	}else{
-	  fprintf(stderr,"Bad file: %s%s\n", path, file);
+	  fprintf(stdout,"Bad file: %s%s\n", path, file);
 	  free(file);
 	  free(tmp);
 	  return -1;
@@ -1099,9 +1114,7 @@ int parse_http(char* buffer, http_request* request){
 
 void dump_request(http_request* r){
 
-	printf("'%s' '%s' '%s' '%s'\n", &r->method[0], &r->path[0], &r->file[0], &r->httpv[0]);
 	int n = 0;
-	printf("query_string:%s\n", &r->query_string[0]);
 	while(1){
 	 if(r->headers[n]==NULL) break;
 	 printf("%s\n", r->headers[n++]);
@@ -1311,9 +1324,6 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 
 	memset(buffer,0,2048);
 
-	//test_chunked(&request);
-	//return CONN_CLOSE;
-
 	r=readline(&request, buffer, 2048);
 	if(r<1) return CONN_CLOSE;
 
@@ -1355,6 +1365,8 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	 parse_headers(buffer,&request);
 	 n++;
 	}
+	if(dump_req) dump_request(&request);
+
 
 	if(c_debug) printf("[exit read_headers]\n");
 
@@ -1396,7 +1408,8 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	if(c_debug) printf("[exit default page]\n");
 
 	if(get_header(&request, "Connection=")!=NULL){
-		strcpy(&request.connection[0],get_header(&request, "Connection="));
+		strcpy(&request.connection[0],
+		get_header(&request, "Connection="));
 	}else{
 		strcpy(&request.connection[0],"Close");
 	}
@@ -1423,6 +1436,16 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	free(tmp);
 
  return ret;
+}
+
+int accept_encoding(const http_request* request, const char* enc){
+
+	char* head = get_header(request,"Accept-Encoding=");
+	if(head!=NULL){
+	  return strstr(head,enc)!=NULL;
+	}
+
+  return 0;
 }
 
 int is_regular_file(const server_conf* serv, const http_request* request) {
@@ -1756,7 +1779,7 @@ int main(int args, char* argv[]){
                  return -1;
                 }
           }
-	  else if(strcmp(argv[i],"-d")==0) c_debug=1;
+	  else if(strcmp(argv[i],"-dhead")==0) dump_req=1;
 	  else if(strcmp(argv[i],"-ssl")==0) use_ssl=1;
 	  else if(strcmp(argv[i],"-tls")==0) use_tls=1;
 	  else if(strcmp(argv[i],"-i")==0) dump_c=1;

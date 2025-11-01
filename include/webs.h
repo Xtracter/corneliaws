@@ -219,6 +219,7 @@ int   handle_proxy(SOCKET sockfd, http_request* request);
 int   proxy_connect(char* clientIP, int port);
 void  domain_to_ip(char* dest, const char* domain);
 int   is_regular_file(const server_conf* serv, const http_request* request);
+int   accept_encoding(const http_request* request, const char* enc);
 user_endpoint* get_user_endpoint(char* argstr);
 virtual_host* get_virtual_host(char* host);
 
