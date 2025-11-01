@@ -8,7 +8,7 @@ nossl:	no_ssl misc
 no-ssl-no-warn: no_ssl_no_warn misc
 
 webs:
-	$(CC) -o bin/cornelia_d -std=c99 -Wall -Wextra -O3 -Iopenssl/include/ -Lopenssl/ src/conf.c src/base64.c src/misc.c src/webs.c src/ssl.c src/tls.c -lcrypt -lssl -lcrypto
+	$(CC) -o bin/cornelia_d -std=c99 -Wall -Wextra -O3 -Iopenssl/include/ -Lopenssl/ src/conf.c src/base64.c src/misc.c src/compress.c src/webs.c src/ssl.c src/tls.c -lcrypt -lssl -lcrypto -lz
 
 misc:
 	$(CC) -o bin/mkpasswd -Wall -Wextra -O3 src/mkpasswd.c -lcrypt

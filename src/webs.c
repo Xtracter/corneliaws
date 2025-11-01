@@ -72,6 +72,7 @@ proxy_target* user_proxy_target = NULL;
 
 void usleep(unsigned long);
 
+int buf_compress(const char* input, int inputSize, char* output, int outputSize);
 
 void init_server() {
 
@@ -705,9 +706,16 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	    }
             sprintf(headb,"HTTP/1.1 200 OK\nConnection: %s\n", &response->request->connection[0]);
 	    n=socket_write(response->request, headb, strlen(headb));
+            sprintf(headb,"Transfer-Encoding: chunked\n");
+//            sprintf(headb,"Content-Encoding: gzip\n");
+	    n=socket_write(response->request, headb, strlen(headb));
+	    n=write_chunked(pipefd[0], response->request);
+	    /*
             while((r=read(pipefd[0], buffer, 1024))){
-              n=socket_write(response->request, buffer, r);
+              //n=socket_write(response->request, buffer, r);
+              n=write_chunked(response->request, buffer, r);
 	    }
+	   */
 	  }
 
 	  (void)(r);
@@ -729,6 +737,50 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	if(abort) send_internal_error(response);
 
  return n;
+}
+
+#define CHUNK_SIZE 2048
+
+int write_chunked(int fd, http_request* request){
+
+
+	int r=0;
+	int n=0;
+	int c=0;
+	char line[64];
+	int len = CHUNK_SIZE;
+	char* buffer = (char*)malloc(len);
+	char* headb = (char*)malloc(len);
+	char* bzip = (char*)malloc(len+256);
+
+	http_request tmp_request;
+
+	tmp_request.sockfd=fd;
+	tmp_request.cSSL = request->cSSL;
+
+	// Read head;
+	while(1){
+	  n=readline(&tmp_request, headb, len);
+	  strcat(headb,"\n");
+	  n=socket_write(request, headb, strlen(headb));
+	  if(n<3) break;
+	}
+
+	while((r=read(fd, buffer, len))){
+	  sprintf(line,"%X\r\n",r);
+	  n=socket_write(request, line, strlen(line));
+          n=socket_write(request, buffer, r);
+  	  n=socket_write(request, "\r\n", 2);
+	}
+	sprintf(line,"%X\r\n",0);
+	n=socket_write(request, line, strlen(line));
+	n=socket_write(request, "\r\n", 2);
+
+	free(bzip);
+	free(buffer);
+	free(headb);
+
+  return n;
 }
 
 int write_plain_file(const http_response* response, int len, char*path, char* fil){
@@ -949,6 +1001,8 @@ void doGetPost(http_request *request){
 	free_response(&response);
 
 }
+
+
 
 int handle_virtual_files(http_request* request){
 
@@ -1256,6 +1310,9 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	request.cSSL = cSSL;
 
 	memset(buffer,0,2048);
+
+	//test_chunked(&request);
+	//return CONN_CLOSE;
 
 	r=readline(&request, buffer, 2048);
 	if(r<1) return CONN_CLOSE;
