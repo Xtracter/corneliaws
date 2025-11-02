@@ -407,7 +407,7 @@ void send_bad_request(http_response* response, char* code){
      	char* buffer=(char*)malloc(4000);
 	response->content_length=strlen(bad_request);
 	strcpy(&response->content_type[0],"text/html");
-        get_head(response, &buffer[0], code);
+        get_head(response, &buffer[0], code,0);
 	socket_write(response->request, &buffer[0], strlen(&buffer[0]));
 	socket_write(response->request,"\r\n",2);
         socket_write(response->request, bad_request, strlen(bad_request));
@@ -422,7 +422,7 @@ void send_bad_request2(http_request* request){
         response.request=request;
         response.content_length=strlen(bad_request);
         strcpy(&response.content_type[0],"text/html");
-        get_head(&response, &buffer[0], D_404_NOT_FOUND);
+        get_head(&response, &buffer[0], D_404_NOT_FOUND,0);
 
         socket_write(request, &buffer[0], strlen(&buffer[0]));
         socket_write(request,"\r\n",2);
@@ -439,7 +439,7 @@ void send_forbidden(http_request* request){
 	response.request=request;
         response.content_length=strlen(forbidden);
         strcpy(&response.content_type[0],"text/html");
-        get_head(&response, &buffer[0], "403 Forbidden");
+        get_head(&response, &buffer[0], "403 Forbidden",0);
 
 	socket_write(request, &buffer[0], strlen(&buffer[0]));
         socket_write(request,"\r\n",2);
@@ -454,7 +454,7 @@ void send_internal_error(http_response* response){
      	char* buffer=(char*)malloc(4000);
         response->content_length=strlen(internal_server_error);
         strcpy(&response->content_type[0],"text/html");
-        get_head(response, &buffer[0], "500 Internal Server Error");
+        get_head(response, &buffer[0], "500 Internal Server Error",0);
         socket_write(response->request, &buffer[0], strlen(&buffer[0]));
         socket_write(response->request,"\r\n",2);
         socket_write(response->request, internal_server_error, strlen(internal_server_error));
@@ -622,7 +622,8 @@ char* get_content_type(char* file, char* ct){
  return ct;
 }
 
-char* get_head(http_response* response, char* head, char* code){
+
+char* get_head(http_response* response, char* head, char* code, int skipcl){
 
 	char* tmp = (char*)malloc(1024);
 	memset(head,0,1024);
@@ -636,8 +637,10 @@ char* get_head(http_response* response, char* head, char* code){
 	}
 	sprintf(tmp,"%s: %s\n", "Content-Type", &response->content_type[0]);
 	strcat(head,tmp);
-	sprintf(tmp,"%s: %d\n", "Content-Length", response->content_length);
-	strcat(head,tmp);
+	if(!skipcl){
+	  sprintf(tmp,"%s: %d\n", "Content-Length", response->content_length);
+	  strcat(head,tmp);
+	}
 	sprintf(tmp,"%s: %s\n", "Connection", &response->request->connection[0]);
 	strcat(head,tmp);
 	free(tmp);
@@ -715,12 +718,11 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	    n=socket_write(response->request, headb, strlen(headb));
             sprintf(headb,"Transfer-Encoding: chunked\n");
 	    n=socket_write(response->request, headb, strlen(headb));
-	    if((z = accept_encoding(response->request,"gzip"))){
+	    /*if((z = accept_encoding(response->request,"gzip"))){
               sprintf(headb,"Content-Encoding: gzip\n");
   	      n=socket_write(response->request, headb, strlen(headb));
-	    }
+	    }*/
 	    n=write_chunked(pipefd[0], response->request,z);
-
 
 	    /*
             while((r=read(pipefd[0], buffer, 1024))){
@@ -767,8 +769,6 @@ int write_chunked(int fd, http_request* request, int gzip){
 	tmp_request.sockfd=fd;
 	tmp_request.cSSL = request->cSSL;
 
-	if(gzip) printf("Zipping\n");
-
 	// Read head;
 	while(1){
 	  n=readline(&tmp_request, headb, len);
@@ -800,7 +800,6 @@ int write_chunked(int fd, http_request* request, int gzip){
 
 int write_plain_file(const http_response* response, int len, char*path, char* fil){
 
-
 	FILE *fd;
 	int r=0;
 	char *file;
@@ -823,10 +822,10 @@ int write_plain_file(const http_response* response, int len, char*path, char* fi
 	    socket_write(response->request, tmp, r);
 	    n+=r;
 	  }
-	  if(n!=len) fprintf(stdout,"Bytes read: %d are less than content-length: %d\n", n, len);
+	  if(n!=len) fprintf(stderr,"Bytes read: %d are less than content-length: %d\n", n, len);
 	  fclose(fd);
 	}else{
-	  fprintf(stdout,"Bad file: %s%s\n", path, file);
+	  fprintf(stderr,"Bad file: %s%s\n", path, file);
 	  free(file);
 	  free(tmp);
 	  return -1;
@@ -988,7 +987,6 @@ void doGetPost(http_request *request){
 
   	response.content_length = get_file_size(request);
 	strcpy(&response.content_type[0],get_content_type(&request->file[0], &ext[0]));
-	//dump_request(request);
 
 	if(c_debug) printf("[content-length read]\n");
 
@@ -1004,7 +1002,7 @@ void doGetPost(http_request *request){
 	  else if((exe_ptr=getExecutable(&request->file[0])) || strcmp(&response.request->method[0],HTTP_POST)==0){
 	    exec_cgi(&response, exe_ptr);
 	  }else{
-	    get_head(&response,&tmp[0], D_200_OK);
+	    get_head(&response,&tmp[0], D_200_OK, 0);
 	    socket_write(request,&tmp[0],strlen(&tmp[0]));
 	    socket_write(request,"\r\n",2);
 	    if(write_plain_file(&response, response.content_length,
