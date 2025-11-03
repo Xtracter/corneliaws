@@ -800,26 +800,39 @@ int write_chunked(int fd, http_request* request, int gzip){
 
 int write_plain_file(const http_response* response, int len, char*path, char* fil){
 
+	int size = 16384;
+	//int size = 1024;
 	FILE *fd;
 	int r=0;
 	char *file;
+	char zoutput[16384];
+	int z = 0;
 
-	char* tmp = (char*)malloc(2048+1);
+	char* tmp = (char*)malloc(size+1);
 	if(tmp==NULL) {
 	 fprintf(stderr,"Can't malloc for %s", fil);
 	 return -1;
 	}
 
-	file = (char*)malloc(2048);
-	memset(file,0,2048);
-	memset(tmp,0,2048+1);
+	int gzip = 0;//accept_encoding(response->request,"gzip");
+
+	file = (char*)malloc(size);
+	memset(file,0,size);
+	memset(tmp,0,size+1);
+	memset(zoutput,0,size);
 
 	sprintf(file,"%s%s%s", &response->request->virtual_path[0], path, fil);
+	if(c_debug) printf("%s:%d\n",file,len);
 
 	int n = 0;
 	if((fd=fopen(file,"rb"))!=NULL){
-	  while((r=fread(tmp, 1, 2048, fd))>0){
-	    socket_write(response->request, tmp, r);
+	  while((r=fread(tmp, 1, size, fd))>0){
+	    if(gzip){
+	      z=buf_compress(tmp,r,zoutput,size);
+	      socket_write(response->request, zoutput,z);
+	    }else{
+	      socket_write(response->request, tmp, r);
+	    }
 	    n+=r;
 	  }
 	  if(n!=len) fprintf(stderr,"Bytes read: %d are less than content-length: %d\n", n, len);
