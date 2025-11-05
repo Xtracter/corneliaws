@@ -8,9 +8,8 @@ char* getenv(const char* name);
 int main(int args, char* argv[]){
 
 
-   printf("Set-Cookie: crazedout=soft\n");
-   printf("Content-Type: image/png\r\n\r\n");
-//   printf("Content-Type: text/text\r\n\r\n");
+   printf("Content-Type: gzip\n");
+   printf("Content-Type: image/png\n\n");
 
 
    char* buffer = NULL;

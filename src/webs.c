@@ -78,7 +78,10 @@ int accept_encoding(const http_request* request, const char* enc);
 
 void usleep(unsigned long);
 
-int buf_compress(const char* input, int inputSize, char* output, int outputSize);
+//int buf_compress(const char* input, int inputSize, char* output, int outputSize);
+//int stream_compress(const unsigned char* input, unsigned long input_len, unsigned char* compressed);
+int compress_stream(const unsigned char *input, size_t input_len,
+                    unsigned char *output, size_t *output_len);
 
 void init_server() {
 
@@ -718,7 +721,8 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	    n=socket_write(response->request, headb, strlen(headb));
             sprintf(headb,"Transfer-Encoding: chunked\n");
 	    n=socket_write(response->request, headb, strlen(headb));
-	    /*if((z = accept_encoding(response->request,"gzip"))){
+	   /*
+	    if((z = accept_encoding(response->request,"gzip"))){
               sprintf(headb,"Content-Encoding: gzip\n");
   	      n=socket_write(response->request, headb, strlen(headb));
 	    }*/
@@ -753,7 +757,10 @@ int exec_cgi(http_response* response, const char* exe_ptr){
  return n;
 }
 
-
+/*
+int compress_stream(const unsigned char *input, size_t input_len,
+                    unsigned char *output, size_t *output_len)
+*/
 int write_chunked(int fd, http_request* request, int gzip){
 
 
@@ -761,8 +768,9 @@ int write_chunked(int fd, http_request* request, int gzip){
 	int n=0;
 	char line[64];
 	int len = CHUNK_SIZE;
-	char buffer[len];
-	char headb[len];
+	unsigned char buffer[len];
+	unsigned char comp[len];
+	size_t c_len;
 
 	http_request tmp_request;
 
@@ -771,26 +779,29 @@ int write_chunked(int fd, http_request* request, int gzip){
 
 	// Read head;
 	while(1){
-	  n=readline(&tmp_request, headb, len);
-	  strcat(headb,"\n");
-	  n=socket_write(request, headb, strlen(headb));
+	  n=readline(&tmp_request, (char*)buffer, len);
+	  strcat((char*)buffer,"\n");
+	  n=socket_write(request, (char*)buffer, strlen((char*)buffer));
 	  if(n<3) break;
 	}
+	memset(buffer,0,len);
 
 	while((r=read(fd, buffer, len))){
 	  if(gzip){
-	    r=buf_compress(buffer,r,headb,len);
-	    if(dump_req) printf("gzip:%d\n",r);
+	    n=compress_stream(buffer,r,comp,&c_len);
+	    if(dump_req) printf("gzip:%d\n", (int)c_len);
+	    r=c_len;
 	  }
 	  sprintf(line,"%X\r\n",r);
 	  n=socket_write(request, line, strlen(line));
           if(gzip) {
-	    n=socket_write(request, headb, r);
+	    n=socket_write(request, (char*)comp, r);
 	  }else{
-	    n=socket_write(request, buffer, r);
+	    n=socket_write(request, (char*)buffer, r);
           }
   	  n=socket_write(request, "\r\n", 2);
 	}
+
 	sprintf(line,"%X\r\n",0);
 	n=socket_write(request, line, strlen(line));
 	n=socket_write(request, "\r\n", 2);
@@ -828,7 +839,7 @@ int write_plain_file(const http_response* response, int len, char*path, char* fi
 	if((fd=fopen(file,"rb"))!=NULL){
 	  while((r=fread(tmp, 1, size, fd))>0){
 	    if(gzip){
-	      z=buf_compress(tmp,r,zoutput,size);
+	      //z=buf_compress(tmp,r,zoutput,size);
 	      socket_write(response->request, zoutput,z);
 	    }else{
 	      socket_write(response->request, tmp, r);
