@@ -23,6 +23,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _CORNY_MISC_
 
 typedef unsigned char BYTE;
+void  get_formated_date(char* buffer, int len);
 char* clipend(char* str);
 char* trimpath(char* str);
 int   ends_with(char* string, char* end);

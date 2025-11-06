@@ -50,6 +50,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define HTTP_OPTIONS		"OPTIONS"
 #define AUTHORIZATION 		"Authorization="
 
+#define D_204_NO_CONTENT	"204 No Content"
 #define D_404_NOT_FOUND		"404 Not Found"
 #define D_200_OK		"200 OK"
 
@@ -61,14 +62,13 @@ auth_conf   a_conf;
 
 char* bad_request;
 char* internal_server_error;
-char* forbidden;
 char* unauthorized;
-char* http_options;
+char* forbidden;
 char* ACAOrigin;
 char  conf_file[1024] = "conf/corny.conf";
 char  cip[16];
 void dump_request(http_request* r);
-user_endpoint* user_uep = NULL;
+user_endpoint* user_uep;
 proxy_target* user_proxy_target = NULL;
 
 #define CHUNK_SIZE 4096
@@ -320,7 +320,7 @@ int readline(const http_request* request, char* buffer, int len){
 	fd.events = POLLIN;
 	ret = poll(&fd, 1, (serv_conf.keep_alive_timeout/1000));
 
-	switch (ret) {
+switch (ret) {
     	  case -1:
 	  case 0:
           return -1; // Socket timed out.
@@ -398,12 +398,6 @@ int socket_write(const http_request* request, const char* buffer, int len){
 
   return r;
 }
-
-void send_options_reply(http_request* request){
-
-	socket_write(request, http_options, strlen(http_options));
-}
-
 
 void send_bad_request(http_response* response, char* code){
 
@@ -628,13 +622,23 @@ char* get_content_type(char* file, char* ct){
 
 char* get_head(http_response* response, char* head, char* code, int skipcl){
 
-	char* tmp = (char*)malloc(1024);
+	char tmp[1024];
+	char date[64];
+
 	memset(head,0,1024);
+	memset(date,0,64);
+
+	get_formated_date(date,64);
+
 	sprintf(tmp,"%s %s\n", response->request->httpv, code);
 	strcat(head,tmp);
 	sprintf(tmp,"Server: %s\n", &serv_conf.server_name[0]);
 	strcat(head,tmp);
- 	if(strlen(ACAOrigin)>0){
+	sprintf(tmp,"Date: %s\n", date);
+	strcat(head,tmp);
+	sprintf(tmp,"Allow: %s,%s,%s,%s\n", HTTP_GET,HTTP_HEAD,HTTP_POST,HTTP_OPTIONS);
+	strcat(head,tmp);
+	if(strlen(ACAOrigin)>0){
 	  sprintf(tmp,"%s", ACAOrigin);
 	  strcat(head,tmp);
 	}
@@ -646,7 +650,6 @@ char* get_head(http_response* response, char* head, char* code, int skipcl){
 	}
 	sprintf(tmp,"%s: %s\n", "Connection", &response->request->connection[0]);
 	strcat(head,tmp);
-	free(tmp);
 
  return head;
 }
@@ -694,14 +697,15 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	  argv[1]=NULL;
 	}
 
-        if ((pid=fork()) == 0){
+	  int ex=0;
+        if ((pid=fork()) > 0){
           close(pipefd[0]);
           dup2(pin[0], 0);
           dup2(pipefd[1], 1);
           dup2(pipefd[1], 2);
           close(pipefd[1]);
-          if(execve(executable, argv, response->envp)==-1){
-	   fprintf(stderr,"%s\n", executable);
+          if((ex=execve(executable, argv, response->envp))==-1){
+	   fprintf(stdout,"%s\n", executable);
 	   abort=1;
 	  }
         }else if(pid==-1){
@@ -717,19 +721,13 @@ int exec_cgi(http_response* response, const char* exe_ptr){
             get_head(response, headb, D_200_OK, 1);
             strcat(headb,"Transfer-Encoding: chunked\n");
 	    n=socket_write(response->request, headb, strlen(headb));
-	   /*
+	    /*
 	    if((z = accept_encoding(response->request,"gzip"))){
-              sprintf(headb,"Content-Encoding: gzip\n");
+              memset(headb,0,2048);
+	      sprintf(headb,"Content-Encoding: gzip\n");
   	      n=socket_write(response->request, headb, strlen(headb));
 	    }*/
 	    n=write_chunked(pipefd[0], response->request,z);
-
-	    /*
-            while((r=read(pipefd[0], buffer, 1024))){
-              //n=socket_write(response->request, buffer, r);
-              n=write_chunked(response->request, buffer, r);
-	    }
-	   */
 	  }
 
 	  (void)(r);
@@ -746,7 +744,11 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	   free(argv[n++]);
         }
 
-	if(abort) send_internal_error(response);
+	if(abort) {
+		printf("Aboirt\n");
+		send_internal_error(response);
+
+	}
 
  return n;
 }
@@ -761,9 +763,8 @@ int write_chunked(int fd, http_request* request, int gzip){
 	int r=0;
 	int n=0;
 	char line[64];
-	int len = CHUNK_SIZE;
-	unsigned char buffer[len];
-	unsigned char comp[len];
+	unsigned char buffer[CHUNK_SIZE];
+	unsigned char comp[CHUNK_SIZE];
 	size_t c_len;
 
 	http_request tmp_request;
@@ -773,17 +774,18 @@ int write_chunked(int fd, http_request* request, int gzip){
 
 	// Read head;
 	while(1){
-	  n=readline(&tmp_request, (char*)buffer, len);
+	  n=readline(&tmp_request, (char*)buffer, CHUNK_SIZE);
 	  strcat((char*)buffer,"\n");
 	  n=socket_write(request, (char*)buffer, strlen((char*)buffer));
 	  if(n<3) break;
 	}
-	memset(buffer,0,len);
+	memset(buffer,0,CHUNK_SIZE);
+	memset(comp,0,CHUNK_SIZE);
 
-	while((r=read(fd, buffer, len))){
+	while((r=read(fd,buffer, CHUNK_SIZE))){
 	  if(gzip){
 	    n=compress_stream(buffer,r,comp,&c_len);
-	    if(dump_req) printf("gzip:%d\n", (int)c_len);
+	    if(dump_req) printf("gzip:%d %d %zu\n", n, r, c_len);
 	    r=c_len;
 	  }
 	  sprintf(line,"%X\r\n",r);
@@ -805,23 +807,22 @@ int write_chunked(int fd, http_request* request, int gzip){
 
 int write_plain_file(const http_response* response, int len, char*path, char* fil){
 
-	int size = 16384;
 	FILE *fd;
+	char* enc = "Content-Encoding: gzip\n";
+	size_t size = 16384;
 	int r=0;
-	char *file;
-	char zoutput[16384];
+	char file[2048];
+	unsigned char zoutput[size];
 	int z = 0;
-
-	char* tmp = (char*)malloc(size+1);
-	if(tmp==NULL) {
-	 fprintf(stderr,"Can't malloc for %s", fil);
-	 return -1;
-	}
+	unsigned char tmp[size+1];
 
 	int gzip = 0;//accept_encoding(response->request,"gzip");
+	if(gzip){
+	  socket_write(response->request,enc,strlen(enc));
+	}
+	socket_write(response->request,"\n",1);
 
-	file = (char*)malloc(size);
-	memset(file,0,size);
+	memset(file,0,2048);
 	memset(tmp,0,size+1);
 	memset(zoutput,0,size);
 
@@ -832,10 +833,11 @@ int write_plain_file(const http_response* response, int len, char*path, char* fi
 	if((fd=fopen(file,"rb"))!=NULL){
 	  while((r=fread(tmp, 1, size, fd))>0){
 	    if(gzip){
-	      //z=buf_compress(tmp,r,zoutput,size);
-	      socket_write(response->request, zoutput,z);
+	      z=compress_stream(tmp,r,zoutput,&size);
+	      ((void)z);
+	      r=socket_write(response->request, (char*)zoutput,size);
 	    }else{
-	      socket_write(response->request, tmp, r);
+	      socket_write(response->request, (char*)tmp, r);
 	    }
 	    n+=r;
 	  }
@@ -843,13 +845,8 @@ int write_plain_file(const http_response* response, int len, char*path, char* fi
 	  fclose(fd);
 	}else{
 	  fprintf(stderr,"Bad file: %s%s\n", path, file);
-	  free(file);
-	  free(tmp);
 	  return -1;
 	}
-
-	free(tmp);
-	free(file);
 
  return 0;
 }
@@ -965,14 +962,29 @@ void doPut(http_request* request){
 	printf("PUT %s\n", request->post_data);
 	(void)(request);
 }
-/*
-void doHead(http_request* request){
+
+int doHead(http_response* response){
+
+	char buffer[1024];
 
 	if(c_debug) printf("[do head]\n");
-	(void)(request);
+	get_head(response, buffer, D_200_OK, 0);
+	strcat(buffer,"\n");
+	return socket_write(response->request,buffer,strlen(buffer));
 
 }
-*/
+
+int doOptions(http_response* response){
+
+	char buffer[1024];
+
+	if(c_debug) printf("[do options]\n");
+	get_head(response, buffer, D_204_NO_CONTENT, 1);
+	strcat(buffer,"\n");
+	return socket_write(response->request,buffer,strlen(buffer));
+
+}
+
 
 void doGetPost(http_request *request){
 
@@ -984,13 +996,6 @@ void doGetPost(http_request *request){
 	memset(&response,0,sizeof(http_response));
 	response.envp[0]=NULL;
 	response.request=request;
-
-	if(c_debug) printf("[doGetPost]\n");
-	if(strcmp(&request->method[0],HTTP_OPTIONS)==0){
-	 if(c_debug) printf("[send_options_reply]\n");
-	 send_options_reply(request);
-	 return;
-	}
 
 	auth_mode=handle_auth(request);
 	switch(auth_mode){
@@ -1006,6 +1011,7 @@ void doGetPost(http_request *request){
 	strcpy(&response.content_type[0],get_content_type(&request->file[0], &ext[0]));
 
 	if(c_debug) printf("[content-length read]\n");
+	if(c_debug) fprintf(stdout,"%s\n",response.request->method);
 
 	if(response.content_length<1){
 	  send_bad_request(&response, D_404_NOT_FOUND);
@@ -1013,15 +1019,15 @@ void doGetPost(http_request *request){
 	  parse_env(&response);
 	  if(strcmp(&response.request->method[0],HTTP_PUT)==0){
 	   doPut(request);
-	  }/*else if(strcmp(&response.request->method[0],HTTP_HEAD)==0){
-	   doHead(request);
-	  }*/
-	  else if((exe_ptr=getExecutable(&request->file[0])) || strcmp(&response.request->method[0],HTTP_POST)==0){
+	  }else if(strcmp(&response.request->method[0],HTTP_HEAD)==0){
+	   doHead(&response);
+	  }else if(strcmp(&response.request->method[0],HTTP_OPTIONS)==0){
+	   doOptions(&response);
+	  } else if((exe_ptr=getExecutable(&request->file[0])) || strcmp(&response.request->method[0],HTTP_POST)==0){
 	    exec_cgi(&response, exe_ptr);
 	  }else{
 	    get_head(&response,&tmp[0], D_200_OK, 0);
 	    socket_write(request,&tmp[0],strlen(&tmp[0]));
-	    socket_write(request,"\r\n",2);
 	    if(write_plain_file(&response, response.content_length,
 	        &request->path[0], &request->file[0])==-1){
     		send_bad_request(&response, D_404_NOT_FOUND);
@@ -1500,8 +1506,8 @@ int read_http_responses(){
   	int len;
   	int r;
   	FILE* fd;
-	char* file = (char*)malloc(1024);
-	char* buffer = (char*)malloc(1024);
+	char file[1024];
+	char buffer[1024];
 
 	sprintf(file,"%s/conf/404.txt", getenv("CORNELIA_HOME"));
   	if((fd=fopen(file,"r"))!=NULL){
@@ -1564,22 +1570,6 @@ int read_http_responses(){
         }
 
 
-       sprintf(file,"%s/conf/http_options.txt", getenv("CORNELIA_HOME"));
-       if((fd=fopen(file,"r"))!=NULL){
-          fseek(fd,0L,SEEK_END);
-          len = ftell(fd);
-          fseek(fd,0L,SEEK_SET);
-          http_options = (char*)malloc(len);
-          r=fread(http_options,1,len,fd);
-          (void)(r);
-          fclose(fd);
-        }else{
-          fprintf(stderr,"Bad file: missing conf/http_options.txt\n");
-          printf("Bad file: missing conf/http_options.txt\n");
-          return -1;
-        }
-
-
        sprintf(file,"%s/conf/Access-Control-Allow.txt", getenv("CORNELIA_HOME"));
         ACAOrigin = (char*)malloc(4096);
 	memset(ACAOrigin,0,4096);
@@ -1597,8 +1587,6 @@ int read_http_responses(){
           return -1;
         }
 
-	free(buffer);
-	free(file);
 
  return 0;
 }
@@ -1866,3 +1854,4 @@ int main(int args, char* argv[]){
 
  return 0;
 }
+

@@ -59,6 +59,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <sys/stat.h>
 
 void handle_request(SOCKET sockfd, char* clientIP, void* cSSL);
+void set_user_proxy(char* cmd);
 
 typedef struct proxy_targets_t {
 

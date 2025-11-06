@@ -8,7 +8,7 @@ char* getenv(const char* name);
 int main(int args, char* argv[]){
 
 
-   printf("Content-Type: gzip\n");
+   printf("Content-Encoding: gzip\n");
    printf("Content-Type: image/png\n\n");
 
 

@@ -82,34 +82,50 @@ int decompress_stream(const unsigned char *input, size_t input_len,
 /*
 int main(void) {
 
-    const char *text = "This is a longer example string repeated a few times. "
-                       "This is a longer example string repeated a few times. "
-                       "This is a longer example string repeated a few times. ";
-    size_t input_len = strlen(text) + 1;
+//    const char* text = "This is a longer example string repeated a few times. "
+  //                     "This is a longer example string repeated a few times. "
+    //                   "This is a longer example string repeated a few times. ";
 
-    unsigned char compressed[1024];
-    unsigned char decompressed[1024];
+    int size=2048;
+    char text[size];
+
+    FILE* fd = fopen("/home/nrkfrr/GIT/corneliaws/www/corn2.png","rb");
+    if(fd==NULL){
+      printf("Bad file\n");
+      return -1;
+    }
+    //size_t input_len = strlen(text) + 1;
+    size_t input_len = size;
+    unsigned char compressed[size];
+    unsigned char decompressed[size];
     size_t compressed_len = 0;
     size_t decompressed_len = 0;
+    int r = 0;
 
-    if (compress_stream((const unsigned char *)text, input_len,
-                        compressed, &compressed_len) != Z_OK) {
-        fprintf(stderr, "Compression failed.\n");
-        return 1;
+    FILE* fd2 = fopen("corn2.png","wb");
+    while((r=fread(text,1,size,fd))>0){
+
+      if (compress_stream((const unsigned char *)text, input_len,
+                          compressed, &compressed_len) != Z_OK) {
+          fprintf(stderr, "Compression failed.\n");
+          return 1;
+      }
+
+      printf("Original size: %zu\n", input_len);
+      printf("Compressed size: %zu\n", compressed_len);
+
+      if (decompress_stream(compressed, compressed_len,
+                            decompressed, &decompressed_len) != Z_OK) {
+          fprintf(stderr, "Decompression failed.\n");
+          return 1;
+      }
+
+      printf("Decompressed size: %zu\n", decompressed_len);
+      fwrite(decompressed,1,decompressed_len,fd2);
     }
-
-    printf("Original size: %zu\n", input_len);
-    printf("Compressed size: %zu\n", compressed_len);
-
-    if (decompress_stream(compressed, compressed_len,
-                          decompressed, &decompressed_len) != Z_OK) {
-        fprintf(stderr, "Decompression failed.\n");
-        return 1;
-    }
-
-    printf("Decompressed size: %zu\n", decompressed_len);
-    printf("Decompressed text: %s\n", decompressed);
+    fclose(fd2);
 
     return 0;
 }
 */
+

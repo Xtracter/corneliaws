@@ -28,6 +28,14 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <dirent.h>
 #include <time.h>
 #include <stdio.h>
+#include <time.h>
+
+void get_formated_date(char* buffer, int len) {
+
+    time_t now = time(NULL);
+    struct tm *gmt = gmtime(&now);
+    strftime(buffer, len, "%a, %d %b %Y %H:%M:%S GMT", gmt);
+}
 
 char *str_replace(char *orig, char *rep, char *with) {
     char *result; // the return string
