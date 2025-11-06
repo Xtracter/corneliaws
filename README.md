@@ -75,6 +75,11 @@ For the http <i>OPTIONS</i> request the response is set in conf/http_options.
 </b>
 <p />
 
+<b>HTTP request methods</b><br>
+Cornelia allows GET,POST,HEAD and OPTIONS default.<br>
+Set config server.allow.http.put=yes if yu want to allow PUT.
+<p/>
+
 <b>User enpoints</b><br>
 Set up virtual endpoints:<br>
 In conf/corny:<br>
