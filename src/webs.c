@@ -42,6 +42,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define CONN_KEEP_ALIVE		1
 #define CONN_CLOSE		0
 #define MAX_ALLOC		65536
+#define MAX_FILE_PATH		4096
 
 #define HTTP_POST		"POST"
 #define HTTP_GET		"GET"
@@ -554,6 +555,8 @@ void send_list_dir(http_request* request){
 
 int find_default_page(http_request* request){
 
+	if(strstr(request->method,HTTP_PUT)!=NULL) return 1;
+
 	char* ptr;
 	char* fi = (char*)malloc(MAX_ALLOC);
 	int found=0;
@@ -636,7 +639,12 @@ char* get_head(http_response* response, char* head, char* code, int skipcl){
 	strcat(head,tmp);
 	sprintf(tmp,"Date: %s\n", date);
 	strcat(head,tmp);
-	sprintf(tmp,"Allow: %s,%s,%s,%s\n", HTTP_GET,HTTP_HEAD,HTTP_POST,HTTP_OPTIONS);
+	sprintf(tmp,"Allow: %s,%s,%s,%s", HTTP_GET,HTTP_HEAD,HTTP_POST,HTTP_OPTIONS);
+	if(strcmp(serv_conf.allow_put,"yes")==0) {
+	  strcat(tmp,",");
+	  strcat(tmp, HTTP_PUT);
+	}
+	strcat(tmp,"\n");
 	strcat(head,tmp);
 	if(strlen(ACAOrigin)>0){
 	  sprintf(tmp,"%s", ACAOrigin);
@@ -958,9 +966,28 @@ int handle_auth(http_request* request){
 }
 
 
-void doPut(http_request* request){
-	printf("PUT %s\n", request->post_data);
-	(void)(request);
+void doPut(http_response* response){
+
+	char file_path[MAX_FILE_PATH];
+	int r = 0;
+	FILE* fd;
+
+	if(c_debug) printf("[doPut]\n");
+
+	sprintf(file_path,"%s%s%s",
+		response->request->virtual_path,response->request->path,response->request->file);
+	if(file_path[strlen(file_path)-1]=='/') file_path[strlen(file_path)-1] = '\0';
+	if((fd=fopen(file_path,"wb"))!=NULL){
+          r=fwrite(response->request->post_data,1,response->request->post_data_len,fd);
+	  if(r<response->request->post_data_len){
+	    printf("Bad Post data length\n");
+	  }
+	  fclose(fd);
+	}else{
+	 send_forbidden(response->request);
+	}
+
+	if(c_debug) printf("[end doPut]\n");
 }
 
 int doHead(http_response* response){
@@ -1007,30 +1034,34 @@ void doGetPost(http_request *request){
 	}
 
 
-  	response.content_length = get_file_size(request);
+  	if(strcmp(request->method,HTTP_PUT)!=0) response.content_length = get_file_size(request);
 	strcpy(&response.content_type[0],get_content_type(&request->file[0], &ext[0]));
 
 	if(c_debug) printf("[content-length read]\n");
 	if(c_debug) fprintf(stdout,"%s\n",response.request->method);
 
-	if(response.content_length<1){
+	if(response.content_length<1 && strstr(request->method,HTTP_PUT)==NULL){
+	  printf(">%s\n", response.request->method);
 	  send_bad_request(&response, D_404_NOT_FOUND);
 	}else{
 	  parse_env(&response);
-	  if(strcmp(&response.request->method[0],HTTP_PUT)==0){
-	   doPut(request);
-	  }else if(strcmp(&response.request->method[0],HTTP_HEAD)==0){
+	  if(strcmp(response.request->method,HTTP_PUT)==0 && strcmp(serv_conf.allow_put,"yes")==0){
+	   doPut(&response);
+	   get_head(&response,tmp,D_200_OK, 1);
+	   strcat(tmp,"\n");
+	   socket_write(request,tmp,strlen(tmp));
+	  }else if(strcmp(response.request->method,HTTP_HEAD)==0){
 	   doHead(&response);
-	  }else if(strcmp(&response.request->method[0],HTTP_OPTIONS)==0){
+	  }else if(strcmp(response.request->method,HTTP_OPTIONS)==0){
 	   doOptions(&response);
-	  } else if((exe_ptr=getExecutable(&request->file[0])) || strcmp(&response.request->method[0],HTTP_POST)==0){
+	  }else if((exe_ptr=getExecutable(request->file)) || strcmp(&response.request->method[0],HTTP_POST)==0){
 	    exec_cgi(&response, exe_ptr);
 	  }else{
 	    get_head(&response,&tmp[0], D_200_OK, 0);
-	    socket_write(request,&tmp[0],strlen(&tmp[0]));
+	    socket_write(request,&tmp[0],strlen(tmp));
 	    if(write_plain_file(&response, response.content_length,
 	        &request->path[0], &request->file[0])==-1){
-    		send_bad_request(&response, D_404_NOT_FOUND);
+		send_bad_request(&response, D_404_NOT_FOUND);
 	    }
 	  }
 	}
@@ -1262,6 +1293,8 @@ void parse_env(http_response* res){
 
 void read_post_data(http_request *request, unsigned int len){
 
+        printf("read_post_data\n");
+
 	int r = 0;
 	unsigned int n = 0;
 	unsigned int m_len = len<serv_conf.max_post_data?len:serv_conf.max_post_data;
@@ -1278,6 +1311,7 @@ void read_post_data(http_request *request, unsigned int len){
 	  request->post_data[n++]=buff[0];
 	  if(n>=m_len) break;
 	}
+	request->post_data_len=n;
 }
 
 virtual_host* get_virtual_host(char* host){

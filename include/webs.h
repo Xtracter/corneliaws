@@ -125,6 +125,7 @@ typedef struct http_request_t {
         char* headers[MAX_HTTP_HEADERS];
         int   headers_len;
         unsigned char* post_data;
+	int post_data_len;
 	void* cSSL;
 	char connection[65];
 	char virtual_path[MAX_VIRTUAL_PATH];
@@ -155,7 +156,8 @@ typedef struct server_conf_t {
 	char cgi_bin[MAX_CGI_BIN];
         char execs[MAX_EXEC_DEF];
 	char logfile[MAX_LOG_FILE];
-	char allow_dir_listing[16];
+	char allow_dir_listing[8];
+	char allow_put[8];
         auth_conf* auth[MAX_AUTH_REALMS];
 	content_type* content_types[MAX_CONTENT_TYPES];
 	cgi_exec* exec_c[MAX_EXEC_DEF];
@@ -173,6 +175,7 @@ typedef struct server_conf_t {
 
 } server_conf;
 
+void  doPut(http_response* response);
 void  init_server();
 int   get_file_size(const http_request* request);
 int   readline_ssl(const http_request* request, char* buffer, int len);
