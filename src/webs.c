@@ -658,8 +658,7 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	int z = 0;
 	char* argv[128];
 
-        char *buffer;
-        char *headb;
+        char headb[2048];
         char *file_path = (char*)malloc(MAX_ALLOC);
 	char *executable = (char*)malloc(1024);
 	int  clen=0;
@@ -709,17 +708,14 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	  perror("Bad fork() in exec_cgi\n");
 	}
 	else{
-	  buffer = (char*)malloc(1024);
-	  headb = (char*)malloc(1024);
           close(pipefd[1]);
 	  if(!abort){
             if(strcmp(&response->request->method[0],HTTP_POST)==0 && response->request->post_data!=NULL) {
 	      clen = response->content_length;
 	      r=write(pin[1], response->request->post_data, clen);
 	    }
-            sprintf(headb,"HTTP/1.1 200 OK\nConnection: %s\n", &response->request->connection[0]);
-	    n=socket_write(response->request, headb, strlen(headb));
-            sprintf(headb,"Transfer-Encoding: chunked\n");
+            get_head(response, headb, D_200_OK, 1);
+            strcat(headb,"Transfer-Encoding: chunked\n");
 	    n=socket_write(response->request, headb, strlen(headb));
 	   /*
 	    if((z = accept_encoding(response->request,"gzip"))){
@@ -740,8 +736,6 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	  close(pipefd[0]);
 	  close(pin[0]);
 	  close(pin[1]);
-          free(buffer);
-          free(headb);
 	}
 
         free(file_path);
@@ -812,7 +806,6 @@ int write_chunked(int fd, http_request* request, int gzip){
 int write_plain_file(const http_response* response, int len, char*path, char* fil){
 
 	int size = 16384;
-	//int size = 1024;
 	FILE *fd;
 	int r=0;
 	char *file;
