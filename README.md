@@ -69,16 +69,17 @@ Delete these files at your own discretion. Please leave "www/res" as the icons f
 If you change the root directory, Cornelia will still look for these icons in /res so a sym link or actual move is recommended.<p/>
 <p/>
 
+<b>HTTP request methods</b><br>
+Cornelia allows GET,POST,HEAD and OPTIONS default.<br>
+Set config server.allow.http.put=yes if yu want to allow PUT.
+<p/>
+
+
 <b>Warning: Since Cornelias primary purpose is for development the header 'Access-Control-Allow-Origin' is set to '*' by default.<br>
 This is dangerous in a open context. Change this in conf/Access-Control-Allow.txt<p/>
 For the http <i>OPTIONS</i> request the response is set in conf/http_options.
 </b>
 <p />
-
-<b>HTTP request methods</b><br>
-Cornelia allows GET,POST,HEAD and OPTIONS default.<br>
-Set config server.allow.http.put=yes if yu want to allow PUT.
-<p/>
 
 <b>User enpoints</b><br>
 Set up virtual endpoints:<br>
