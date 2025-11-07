@@ -579,6 +579,7 @@ void send_list_dir(http_request* request){
 
 }
 
+
 int find_default_page(http_request* request){
 
 	if(strstr(request->method,HTTP_PUT)!=NULL) return 1;
@@ -1219,8 +1220,6 @@ int parse_http(char* buffer, http_request* request){
 
         char* ptr;
 	int res = 0;
-
-	printf("1>%s\n", buffer);
 
 	if(c_debug) printf("[parse_http]\n");
 
