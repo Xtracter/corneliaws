@@ -184,8 +184,6 @@ int   readline_ssl(const http_request* request, char* buffer, int len);
 int   readline(const http_request* request, char* buffer, int len);
 void  send_options_reply(http_request* request);
 void  send_bad_request(http_response* response, char* code);
-/* Not very pretty but it will do for now...*/
-void  send_bad_request2(http_request* request);
 void  send_forbidden(http_request* request);
 void  send_internal_error(http_response* response);
 void  list_dir (const char* dir, char* buffer);
@@ -205,7 +203,7 @@ int   parse_http(char* buffer, http_request* request);
 void  dump_request(http_request* r);
 char* get_header(const http_request *request, const char* header);
 void  parse_headers(char* buffer, http_request* request);
-void  read_post_data(http_request *request, unsigned int len);
+int   read_post_data(http_request *request, unsigned int len);
 void  handle_request(SOCKET sockfd, char* clientIP, void* cSSL);
 int   exec_request(SOCKET sockfd, char* clientIP, void* cSSL);
 void  free_request(http_request* r);
@@ -228,6 +226,9 @@ int   is_regular_file(const server_conf* serv, const http_request* request);
 int   accept_encoding(const http_request* request, const char* enc);
 user_endpoint* get_user_endpoint(char* argstr);
 virtual_host* get_virtual_host(char* host);
+/* Not very pretty but it will do for now...*/
+void  send_bad_request2(http_request* request);
+void  send_internal_error2(http_request* request);
 
 #endif
 

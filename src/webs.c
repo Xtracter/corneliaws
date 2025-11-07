@@ -52,9 +52,11 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define HTTP_OPTIONS		"OPTIONS"
 #define AUTHORIZATION 		"Authorization="
 
-#define D_204_NO_CONTENT	"204 No Content"
-#define D_404_NOT_FOUND		"404 Not Found"
-#define D_200_OK		"200 OK"
+#define D_204_NO_CONTENT		"204 No Content"
+#define D_404_NOT_FOUND			"404 Not Found"
+#define D_200_OK			"200 OK"
+#define D_500_INTERNAL_SERVER_ERROR 	"500 Internal Server Error"
+#define D_400_FORBIDDEN 		"400 Forbidden"
 
 
 int c_debug = 0;
@@ -402,7 +404,7 @@ int socket_write(const http_request* request, const char* buffer, int len){
 }
 
 void send_bad_request(http_response* response, char* code){
-
+	if(c_debug) printf("[send bad request]\n");
      	char* buffer=(char*)malloc(4000);
 	response->content_length=strlen(bad_request);
 	strcpy(&response->content_type[0],"text/html");
@@ -416,6 +418,7 @@ void send_bad_request(http_response* response, char* code){
 
 void send_bad_request2(http_request* request){
 
+	if(c_debug) printf("[send bad request 2]\n");
         char* buffer=(char*)malloc(4000);
         http_response response;
         response.request=request;
@@ -431,14 +434,17 @@ void send_bad_request2(http_request* request){
         free(buffer);
 }
 
+
 void send_forbidden(http_request* request){
+
+	if(c_debug) printf("[send forbidden]\n");
 
      	char* buffer=(char*)malloc(4000);
 	http_response response;
 	response.request=request;
         response.content_length=strlen(forbidden);
         strcpy(&response.content_type[0],"text/html");
-        get_head(&response, &buffer[0], "403 Forbidden",0);
+        get_head(&response, &buffer[0], D_400_FORBIDDEN,0);
 
 	socket_write(request, &buffer[0], strlen(&buffer[0]));
         socket_write(request,"\r\n",2);
@@ -450,16 +456,35 @@ void send_forbidden(http_request* request){
 
 void send_internal_error(http_response* response){
 
+	if(c_debug) printf("[send internal error]\n");
      	char* buffer=(char*)malloc(4000);
         response->content_length=strlen(internal_server_error);
         strcpy(&response->content_type[0],"text/html");
-        get_head(response, &buffer[0], "500 Internal Server Error",0);
+        get_head(response, &buffer[0], D_500_INTERNAL_SERVER_ERROR, 0);
         socket_write(response->request, &buffer[0], strlen(&buffer[0]));
         socket_write(response->request,"\r\n",2);
         socket_write(response->request, internal_server_error, strlen(internal_server_error));
 	socket_write(response->request, "\n\n",2);
 	free(buffer);
 }
+
+
+void send_internal_error2(http_request* request){
+
+	if(c_debug) printf("[send internal error 2]\n");
+     	char* buffer=(char*)malloc(4000);
+	http_response response;
+	response.request=request;
+        response.content_length=strlen(forbidden);
+        strcpy(response.content_type,"text/html");
+        get_head(&response, buffer, D_500_INTERNAL_SERVER_ERROR, 0);
+        socket_write(response.request, &buffer[0], strlen(&buffer[0]));
+        socket_write(response.request,"\r\n",2);
+        socket_write(response.request, internal_server_error, strlen(internal_server_error));
+	socket_write(response.request, "\n\n",2);
+	free(buffer);
+}
+
 
 void list_dir (const char* dir, char* buffer) {
 
@@ -692,6 +717,8 @@ int exec_cgi(http_response* response, const char* exe_ptr){
         n=pipe(pin);
         n=0;
 
+	if(c_debug) printf("[exec_cgi]\n");
+
         sprintf(file_path,"%s%s%s",
 		&response->request->virtual_path[0],&response->request->path[0],&response->request->file[0]);
 
@@ -726,14 +753,16 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	   abort=1;
 	  }
         }else if(pid==-1){
-	  perror("Bad fork() in exec_cgi\n");
+	  printf("Bad fork() in exec_cgi\n");
 	}
 	else{
           close(pipefd[1]);
 	  if(!abort){
+	    if(c_debug) printf("in post:%d\n", response->request->post_data!=NULL);
             if(strcmp(&response->request->method[0],HTTP_POST)==0 && response->request->post_data!=NULL) {
 	      clen = response->content_length;
 	      r=write(pin[1], response->request->post_data, clen);
+	      if(c_debug) printf("[post_data_written: %d]\n",r);
 	    }
             get_head(response, headb, D_200_OK, 1);
             strcat(headb,"Transfer-Encoding: chunked\n");
@@ -1191,6 +1220,8 @@ int parse_http(char* buffer, http_request* request){
         char* ptr;
 	int res = 0;
 
+	printf("1>%s\n", buffer);
+
 	if(c_debug) printf("[parse_http]\n");
 
 	ptr=strtok(&buffer[0]," ");
@@ -1217,12 +1248,14 @@ int parse_http(char* buffer, http_request* request){
 	    return -1;
 	}
 
+	if(c_debug) printf("[exit parse_http]\n");
  return res;
 }
 
 void dump_request(http_request* r){
 
 	int n = 0;
+	printf("%s\n", r->request);
 	while(1){
 	 if(r->headers[n]==NULL) break;
 	 printf("%s\n", r->headers[n++]);
@@ -1347,16 +1380,16 @@ void parse_env(http_response* res){
 	free(tmp);
 }
 
-void read_post_data(http_request *request, unsigned int len){
+int read_post_data(http_request *request, unsigned int len){
 
+	if(c_debug) printf("[read_post_data]\n");
 	int r = 0;
 	unsigned int n = 0;
 	unsigned int m_len = len<serv_conf.max_post_data?len:serv_conf.max_post_data;
 	char buff[2];
 
 	if(len>serv_conf.max_post_data){
-	  send_forbidden(request);
-	  return;
+	  return -1;
 	}
 
 	request->post_data = malloc(m_len);
@@ -1366,6 +1399,9 @@ void read_post_data(http_request *request, unsigned int len){
 	  if(n>=m_len) break;
 	}
 	request->post_data_len=n;
+	if(c_debug) printf("[read_post_data:%d]\n",n);
+
+   return n;
 }
 
 virtual_host* get_virtual_host(char* host){
@@ -1527,7 +1563,10 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 
 	if(strcmp(&request.method[0],HTTP_POST)==0 || strcmp(&request.method[0],HTTP_PUT)==0){
 	 if((ptr = get_header(&request,"Content-Length="))!=NULL){
-	  read_post_data(&request, atoi(ptr));
+	  if(read_post_data(&request, atoi(ptr))==-1){
+	   send_internal_error2(&request);
+	   return CONN_CLOSE;
+	  }
 	 }else request.post_data=NULL;
 	}
 
