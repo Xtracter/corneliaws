@@ -71,7 +71,18 @@ If you change the root directory, Cornelia will still look for these icons in /r
 
 <b>HTTP request methods</b><br>
 Cornelia allows GET,POST,HEAD and OPTIONS default.<br>
-Set config server.allow.http.put=yes if yu want to allow PUT.
+>Set config server.allow.http.put=yes if yu want to allow PUT.
+>Set config server.allow.http.delete=yes if yu want to allow DELETE.
+>Set confif server.rest.path=<allowed path> to restrict PUT and DELETE requests.
+Warning: Since PUT and DELETE writes to disk a PUT/DELETE path should be 
+<p>
+
+<b>PUT example</b><br>
+>curl -X PUT -H 'Content-Type: application/json' -d '{"name":"James", ...}' localhost:8080/rest/file.json<br>
+
+<b>DELETE example</b><br>
+>curl -X DELETE -H localhost:8080/rest/file.json<br>
+
 <p/>
 
 
