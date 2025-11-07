@@ -74,7 +74,7 @@ Cornelia allows GET,POST,HEAD and OPTIONS default.<br>
 >Set config server.allow.http.put=yes if yu want to allow PUT.
 >Set config server.allow.http.delete=yes if yu want to allow DELETE.
 >Set confif server.rest.path=<allowed path> to restrict PUT and DELETE requests.
-Warning: Since PUT and DELETE writes to disk a PUT/DELETE path should be 
+Warning: Since PUT and DELETE writes to disk a PUT/DELETE path should be behind Basic-Authentication.
 <p>
 
 <b>PUT example</b><br>
