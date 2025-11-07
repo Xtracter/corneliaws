@@ -23,23 +23,25 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _CORNY_MISC_
 
 typedef unsigned char BYTE;
-void  get_formated_date(char* buffer, int len);
-char* clipend(char* str);
-char* trimpath(char* str);
-int   ends_with(char* string, char* end);
-char* get_date_time(char* buffer);
-char* clip(char* buffer);
-char* toupperc(char* upper, const char* buffer, char stop);
-char* get_work_dir(char* cwd, int len);
-void  split(const char* buffer, char* path, char* file, char* qs, unsigned int maxqs);
-int   startsw(const char* str, const char* str2);
-char* trim(char* buffer);
-void  url_encoder_rfc_tables_init(char* html5, char* rfc3986, int len);
-char* url_encode( char *table, unsigned char *s, char *enc);
-int   file_exists(const char* file);
-int   copy_file(const char* orig, const char* new);
-int   decode(const char *s, char *dec);
-char* get_http_param(const char* qs, char* buffer, char* name);
-char* char_replace(char* source, char replace, char replacement);
-char* str_replace(char *orig, char *rep, char *with);
+void   get_formated_date(char* buffer, int len);
+char*  clipend(char* str);
+char*  trimpath(char* str);
+int    ends_with(char* string, char* end);
+char*  get_date_time(char* buffer);
+char*  clip(char* buffer);
+char*  toupperc(char* upper, const char* buffer, char stop);
+char*  get_work_dir(char* cwd, int len);
+void   split(const char* buffer, char* path, char* file, char* qs, unsigned int maxqs);
+int    startsw(const char* str, const char* str2);
+char*  trim(char* buffer);
+void   url_encoder_rfc_tables_init(char* html5, char* rfc3986, int len);
+char*  url_encode( char *table, unsigned char *s, char *enc);
+int    file_exists(const char* file);
+int    copy_file(const char* orig, const char* new);
+int    decode(const char *s, char *dec);
+char*  get_http_param(const char* qs, char* buffer, char* name);
+char*  char_replace(char* source, char replace, char replacement);
+char*  str_replace(char *orig, char *rep, char *with);
+char** str_split(const char* str, const char* delim);
+void   free_array(char** array);
 #endif

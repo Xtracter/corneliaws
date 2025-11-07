@@ -47,6 +47,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define HTTP_POST		"POST"
 #define HTTP_GET		"GET"
 #define HTTP_PUT		"PUT"
+#define HTTP_DELETE		"DELETE"
 #define HTTP_HEAD		"HEAD"
 #define HTTP_OPTIONS		"OPTIONS"
 #define AUTHORIZATION 		"Authorization="
@@ -644,6 +645,14 @@ char* get_head(http_response* response, char* head, char* code, int skipcl){
 	  strcat(tmp,",");
 	  strcat(tmp, HTTP_PUT);
 	}
+	if(strcmp(serv_conf.allow_put,"yes")==0) {
+	  strcat(tmp,",");
+	  strcat(tmp, HTTP_PUT);
+	}
+	if(strcmp(serv_conf.allow_delete,"yes")==0) {
+	  strcat(tmp,",");
+	  strcat(tmp, HTTP_DELETE);
+	}
 	strcat(tmp,"\n");
 	strcat(head,tmp);
 	if(strlen(ACAOrigin)>0){
@@ -966,13 +975,32 @@ int handle_auth(http_request* request){
 }
 
 
+int allow_rest_path(const char* path){
+
+	//@TODO: Fix this to match each path.
+	if(c_debug) printf("allow rest %s %s\n",path,serv_conf.rest_path);
+	if(strstr(serv_conf.rest_path,path)!=NULL) {
+	  if(c_debug) printf("['%s' is allowed for REST]\n",path);
+	  return 1;
+	}
+
+	if(c_debug) printf("['%s' is not allowed for REST]\n",path);
+
+  return 0;
+}
+
 void doPut(http_response* response){
 
 	char file_path[MAX_FILE_PATH];
+	char head[1024];
 	int r = 0;
 	FILE* fd;
 
 	if(c_debug) printf("[doPut]\n");
+	if(!allow_rest_path(response->request->path)){
+	  send_forbidden(response->request);
+	  return;
+	}
 
 	sprintf(file_path,"%s%s%s",
 		response->request->virtual_path,response->request->path,response->request->file);
@@ -983,11 +1011,39 @@ void doPut(http_response* response){
 	    printf("Bad Post data length\n");
 	  }
 	  fclose(fd);
+	  get_head(response,head,D_200_OK, 1);
+	  strcat(head,"\n");
+	  socket_write(response->request,head,strlen(head));
 	}else{
 	 send_forbidden(response->request);
 	}
 
 	if(c_debug) printf("[end doPut]\n");
+}
+
+void doDelete(http_response* response){
+
+        char file_path[MAX_FILE_PATH];
+        char head[1024];
+
+        if(c_debug) printf("[doDelete]\n");
+	if(!allow_rest_path(response->request->path)){
+	  send_forbidden(response->request);
+	  return;
+	}
+
+        sprintf(file_path,"%s%s%s",
+                response->request->virtual_path,response->request->path,response->request->file);
+        if(file_path[strlen(file_path)-1]=='/') file_path[strlen(file_path)-1] = '\0';
+	if(remove(file_path)!=0){
+	  send_forbidden(response->request);
+	}else{
+	  get_head(response,head,D_200_OK, 1);
+	  strcat(head,"\n");
+	  socket_write(response->request,head,strlen(head));
+	}
+
+        if(c_debug) printf("[exit doDelete]\n");
 }
 
 int doHead(http_response* response){
@@ -1038,18 +1094,18 @@ void doGetPost(http_request *request){
 	strcpy(&response.content_type[0],get_content_type(&request->file[0], &ext[0]));
 
 	if(c_debug) printf("[content-length read]\n");
-	if(c_debug) fprintf(stdout,"%s\n",response.request->method);
+	if(c_debug) fprintf(stdout,"[%s]\n",response.request->method);
 
 	if(response.content_length<1 && strstr(request->method,HTTP_PUT)==NULL){
-	  printf(">%s\n", response.request->method);
 	  send_bad_request(&response, D_404_NOT_FOUND);
 	}else{
 	  parse_env(&response);
-	  if(strcmp(response.request->method,HTTP_PUT)==0 && strcmp(serv_conf.allow_put,"yes")==0){
+	  if(strcmp(response.request->method,HTTP_PUT)==0 &&
+		strcmp(serv_conf.allow_put,"yes")==0){
 	   doPut(&response);
-	   get_head(&response,tmp,D_200_OK, 1);
-	   strcat(tmp,"\n");
-	   socket_write(request,tmp,strlen(tmp));
+	  }else if(strcmp(response.request->method,HTTP_DELETE)==0 &&
+		strcmp(serv_conf.allow_delete,"yes")==0){
+	   doDelete(&response);
 	  }else if(strcmp(response.request->method,HTTP_HEAD)==0){
 	   doHead(&response);
 	  }else if(strcmp(response.request->method,HTTP_OPTIONS)==0){
@@ -1292,8 +1348,6 @@ void parse_env(http_response* res){
 }
 
 void read_post_data(http_request *request, unsigned int len){
-
-        printf("read_post_data\n");
 
 	int r = 0;
 	unsigned int n = 0;
@@ -1755,6 +1809,7 @@ void usage(){
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
 	printf("-d \tdebug mode\n");
+	printf("-head \tprint request headers to stdout\n");
 	printf("-proxy\tset up proxy target [-proxy:host=relay_host:port]\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"name\\\":\\\"value\\\"}%%application/json\n");
 	printf("                        [-uep:/myendpoint%%file:myjson.js%%application/json\n");
@@ -1816,7 +1871,7 @@ int main(int args, char* argv[]){
                  return -1;
                 }
           }
-	  else if(strcmp(argv[i],"-dhead")==0) dump_req=1;
+	  else if(strcmp(argv[i],"-head")==0) dump_req=1;
 	  else if(strcmp(argv[i],"-ssl")==0) use_ssl=1;
 	  else if(strcmp(argv[i],"-tls")==0) use_tls=1;
 	  else if(strcmp(argv[i],"-i")==0) dump_c=1;
@@ -1827,7 +1882,7 @@ int main(int args, char* argv[]){
 	  else if(strstr(argv[i],"-proxy")!=NULL){
 	    set_user_proxy(&argv[i][7]);
 	  }
-	  else if(strcmp(argv[i],"--help")==0) {
+	  else if(strstr(argv[i],"-help")!=NULL) {
 		usage();
 		return 0;
 	  }

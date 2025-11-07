@@ -60,6 +60,8 @@ void print_server_conf(server_conf* serv){
 	printf("server.keep_alive.timeout=%d\n", serv->keep_alive_timeout);
 	printf("server.max_post_data=%d\n", serv->max_post_data);
 	printf("server.allow.http.put=%s\n", serv->allow_put);
+	printf("server.allow.http.delete=%s\n", serv->allow_delete);
+	printf("server.http.rest.path=%s\n", serv->rest_path);
 	printf("[server_conf]\n\n");
 
 
@@ -199,6 +201,12 @@ void read_server_conf(FILE* fd, server_conf* serv){
 	}
 	else if((ptr=strstr(buffer, "server.allow.http.put="))!=NULL){
 	 strcpy(serv->allow_put, ptr+22);
+	}
+	else if((ptr=strstr(buffer, "server.allow.http.delete="))!=NULL){
+	 strcpy(serv->allow_delete, ptr+25);
+	}
+	else if((ptr=strstr(buffer, "server.rest.path="))!=NULL){
+	 strcpy(serv->rest_path, ptr+17);
 	}
     }
 

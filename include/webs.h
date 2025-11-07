@@ -158,6 +158,8 @@ typedef struct server_conf_t {
 	char logfile[MAX_LOG_FILE];
 	char allow_dir_listing[8];
 	char allow_put[8];
+	char allow_delete[8];
+	char rest_path[256];
         auth_conf* auth[MAX_AUTH_REALMS];
 	content_type* content_types[MAX_CONTENT_TYPES];
 	cgi_exec* exec_c[MAX_EXEC_DEF];

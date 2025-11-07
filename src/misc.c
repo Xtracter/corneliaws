@@ -254,6 +254,39 @@ char* get_work_dir(char* cwd, int len){
    return getcwd(cwd, len);
 }
 
+char** str_split(const char* str, const char* delim){
+
+	char copy[strlen(str)];
+	char* ptr;
+	char** array=NULL;
+	int n=0;
+
+	array = (char**)malloc(64);
+	memset(array,0,64);
+	strcpy(copy,str);
+	printf("%s\n",copy);
+	ptr=strtok(copy,delim);
+	while(ptr!=NULL){
+	  array[n] = (char*)malloc(256);
+	  strcpy(array[n],ptr);
+	  printf("%s\n",ptr);
+	  ptr=strtok(NULL,delim);
+	  n++;
+	}
+
+  return array;
+}
+
+void free_array(char** array){
+
+	int n=0;
+	while(array[n]!=NULL){
+	  free(array[n++]);
+	}
+	free(array);
+
+}
+
 void split(const char* buff, char* path, char* file, char* qs, unsigned int maxqs){
 
 	char* buffer = (char*)malloc(strlen(buff)+1);
