@@ -17,6 +17,8 @@
 <title><%=title%></title>
 </head>
 <body>
+Hello World - JSPZ awakening...
+
 <pre>
 
 <%
@@ -30,7 +32,6 @@
 </pre>
 <%=request.getQueryString()%>
 
-Hello World - JSPZ awakening...
 
 </body>
 </html>
