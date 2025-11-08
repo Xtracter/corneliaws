@@ -759,8 +759,6 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	  argv[1]=NULL;
 	}
 
-	printf(">%s\n",executable);
-
 	int ex=0;
         if ((pid=fork()) > 0){
           close(pipefd[0]);
