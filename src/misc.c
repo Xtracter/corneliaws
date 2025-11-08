@@ -256,7 +256,7 @@ char* get_work_dir(char* cwd, int len){
 
 char** str_split(const char* str, const char* delim){
 
-	char copy[strlen(str)];
+	char copy[strlen(str)+1];
 	char* ptr;
 	char** array=NULL;
 	int n=0;
