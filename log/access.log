@@ -1,0 +1,3 @@
+
+GET /test.php HTTP/1.1|250.85.0.0|8080|Sat Nov  8 12:59:05 2025
+GET /favicon.ico HTTP/1.1|250.85.0.0|8080|Sat Nov  8 12:59:05 2025

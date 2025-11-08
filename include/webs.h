@@ -23,6 +23,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _WEBS_CONF_
 
 #define ORG_SERVER_NAME "Cornelia"
+#define ORG_SERVER_VERSION "1.3"
 
 #define MAX_WWW_ROOT		256
 #define MAX_WORK_DIR		1024
@@ -122,6 +123,7 @@ typedef struct http_request_t {
         char  query_string[2048];
         char  httpv[12];
         char  clientIP[16];
+        char  clientDomain[1024];
         char* headers[MAX_HTTP_HEADERS];
         int   headers_len;
         unsigned char* post_data;

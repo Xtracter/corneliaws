@@ -84,12 +84,22 @@ proxy_target* user_proxy_target = NULL;
 #define ACCESS	    0
 
 int write_chunked(int fd, http_request* request, int gzip);
+
 int accept_encoding(const http_request* request, const char* enc);
 
 void usleep(unsigned long);
 
 int compress_stream(const unsigned char *input, size_t input_len,
                     unsigned char *output, size_t *output_len);
+
+int getnameinfo(socklen_t hostlen, socklen_t servlen;
+                       const struct sockaddr *restrict addr, socklen_t addrlen,
+                       char host[],
+                       socklen_t hostlen,
+                       char serv[],
+                       socklen_t servlen,
+                       int flags);
+
 
 void logc(int type, const char* message){
 
@@ -166,7 +176,6 @@ void init_server() {
 	    setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 	    handle_request(connfd,cip,NULL);
 	    shutdown(connfd,SHUT_RDWR);
-
 	    loop=0;
 	    if(c_debug) printf("exit\n");
 	  }
@@ -177,6 +186,74 @@ void init_server() {
         }
 
 }
+
+
+int ip_to_domain(const char* ip, char* host) {
+
+    struct sockaddr_storage sa;
+    socklen_t sa_len;
+
+    memset(&sa, 0, sizeof(sa));
+
+    struct sockaddr_in *sa4 = (struct sockaddr_in *)&sa;
+    if (inet_pton(AF_INET, ip, &sa4->sin_addr) == 1) {
+        sa4->sin_family = AF_INET;
+        sa_len = sizeof(struct sockaddr_in);
+    }
+    else {
+        struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)&sa;
+        if (inet_pton(AF_INET6, ip, &sa6->sin6_addr) == 1) {
+            sa6->sin6_family = AF_INET6;
+            sa_len = sizeof(struct sockaddr_in6);
+        } else {
+            fprintf(stderr, "Invalid IP address format: %s\n", ip);
+            return EXIT_FAILURE;
+        }
+    }
+
+    int ret = getnameinfo((struct sockaddr *)&sa, sa_len,
+                          host, sizeof(host),
+                          NULL, 0, 8);
+    if (ret != 0) {
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+
+int ip_do_domain(const char* ip, char* host) {
+
+    struct sockaddr_storage sa;
+    socklen_t sa_len;
+
+    memset(&sa, 0, sizeof(sa));
+
+    struct sockaddr_in *sa4 = (struct sockaddr_in *)&sa;
+    if (inet_pton(AF_INET, ip, &sa4->sin_addr) == 1) {
+        sa4->sin_family = AF_INET;
+        sa_len = sizeof(struct sockaddr_in);
+    }else {
+        struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)&sa;
+        if (inet_pton(AF_INET6, ip, &sa6->sin6_addr) == 1) {
+            sa6->sin6_family = AF_INET6;
+            sa_len = sizeof(struct sockaddr_in6);
+        } else {
+            fprintf(stderr, "Invalid IP address format: %s\n", ip);
+            return EXIT_FAILURE;
+        }
+    }
+
+    int ret = getnameinfo((struct sockaddr *)&sa, sa_len,
+                          host, sizeof(host),
+                          NULL, 0, 8);
+    if (ret != 0) {
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
 
 void domain_to_ip(char* dest, const char* domain){
 
@@ -816,11 +893,11 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 
  return n;
 }
-
 /*
 int compress_stream(const unsigned char *input, size_t input_len,
                     unsigned char *output, size_t *output_len)
 */
+
 int write_chunked(int fd, http_request* request, int gzip){
 
 
@@ -1390,6 +1467,33 @@ void parse_env(http_response* res){
 	res->envp[n] = (char*)malloc(strlen(tmp)+1);
 	strcpy(res->envp[n], tmp);
 	n++;
+	if(res->request->cSSL!=NULL){
+	  sprintf(tmp,"HTTPS=true");
+	  res->envp[n] = (char*)malloc(strlen(tmp)+1);
+	  strcpy(res->envp[n], tmp);
+	  n++;
+	}
+	ip_to_domain(res->request->clientIP, res->request->clientDomain);
+	sprintf(tmp,"REMOTE_HOST=%s", res->request->clientDomain);
+	res->envp[n] = (char*)malloc(strlen(tmp)+1);
+	strcpy(res->envp[n], tmp);
+	n++;
+
+	sprintf(tmp,"REMOTE_ADDR=%s", res->request->clientIP);
+	res->envp[n] = (char*)malloc(strlen(tmp)+1);
+	strcpy(res->envp[n], tmp);
+	n++;
+
+	sprintf(tmp,"HTTP_REFERER=%s", get_header(res->request,"Referer=")!=NULL?get_header(res->request,"Referer="):"");
+	res->envp[n] = (char*)malloc(strlen(tmp)+1);
+	strcpy(res->envp[n], tmp);
+	n++;
+
+	sprintf(tmp,"SERVER_SOFTWARE=%s %s", ORG_SERVER_NAME, ORG_SERVER_VERSION);
+	res->envp[n] = (char*)malloc(strlen(tmp)+1);
+	strcpy(res->envp[n], tmp);
+	n++;
+
 
 	free(tmp);
 }
