@@ -64,6 +64,7 @@ int dump_req=0;
 server_conf serv_conf;
 auth_conf   a_conf;
 
+char  log_tmp[256];
 char* bad_request;
 char* internal_server_error;
 char* unauthorized;
@@ -76,22 +77,43 @@ user_endpoint* user_uep;
 proxy_target* user_proxy_target = NULL;
 
 #define CHUNK_SIZE 4096
+#define ACCESS_LOG "log/access.log"
+#define ERROR_LOG  "log/error.log"
+#define ERROR	    1
+#define ACCESS	    0
 
 int write_chunked(int fd, http_request* request, int gzip);
 int accept_encoding(const http_request* request, const char* enc);
 
 void usleep(unsigned long);
 
-//int buf_compress(const char* input, int inputSize, char* output, int outputSize);
-//int stream_compress(const unsigned char* input, unsigned long input_len, unsigned char* compressed);
 int compress_stream(const unsigned char *input, size_t input_len,
                     unsigned char *output, size_t *output_len);
+
+void logc(int type, const char* message){
+
+	FILE* fd;
+	char file[256];
+
+	if(type){
+	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ERROR_LOG);
+	}else{
+	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ERROR_LOG);
+	}
+	if((fd=fopen(file,"a"))!=NULL){
+	  fwrite(message,1,strlen(message),fd);
+	  fclose(fd);
+	}else{
+	  printf("Err: Can't write to logfile: %s\n", file);
+	}
+}
+
 
 void init_server() {
 
 	int loop=1;
 	int connfd;
-	SOCKET port = serv_conf.port;
+	int port = serv_conf.port;
         int sockfd;
 	unsigned int len;
         struct sockaddr_in servaddr, cli;
@@ -124,6 +146,11 @@ void init_server() {
         while(loop){
 
 	  connfd = accept(sockfd, (SA*)&cli, &len);
+	  if(connfd==-1){
+	  sprintf(log_tmp,"Client socket failed. errno %d\n", errno);
+	   logc(ERROR, log_tmp);
+           continue;
+	  }
 	  int pid = fork();
 	  if(pid>0){
 
@@ -192,9 +219,9 @@ int proxy_connect(char* clientIP, int port){
 }
 #define BUFF_SIZE 5000
 
-int handle_proxy(SOCKET sockfd, http_request* request){
+int handle_proxy(int sockfd, http_request* request){
 
-        SOCKET clientfd;
+        int clientfd;
         char* tok;
         char buffer[BUFF_SIZE];
         char header[1024];
@@ -1155,8 +1182,6 @@ void doGetPost(http_request *request){
 
 }
 
-
-
 int handle_virtual_files(http_request* request){
 
 	char* virt;
@@ -1433,7 +1458,7 @@ virtual_host* get_virtual_host(char* host){
 
 
 
-void handle_request(SOCKET sockfd, char* clientIP, void* cSSL){
+void handle_request(int sockfd, char* clientIP, void* cSSL){
 
 	int r=CONN_CLOSE;
 
@@ -1449,7 +1474,7 @@ void handle_request(SOCKET sockfd, char* clientIP, void* cSSL){
 
 }
 
-int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
+int exec_request(int sockfd, char* clientIP, void* cSSL){
 
 	int r=0;
 	char* buffer = (char*)malloc(2048);
@@ -1458,7 +1483,6 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	char* ptr;
 	char* host;
 	int ret = CONN_CLOSE;
-	FILE* logfd;
 
 	http_request request;
 	memset(&request,0,sizeof(http_request));
@@ -1475,13 +1499,8 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 
 	if(c_debug) printf("[readline]\n");
 
-	if(strlen(&serv_conf.logfile[0])>0){
-	  sprintf(tmp, "%s/%s", &serv_conf.workdir[0], &serv_conf.logfile[0]);
-	  if((logfd=fopen(tmp,"a"))!=NULL){
-	    fprintf(logfd,"%s|%s|%d|%s\n", buffer, clientIP, serv_conf.port, clip(get_date_time(tmp)));
-	    fclose(logfd);
-	  }
-	}
+	sprintf(log_tmp,"%s|%s|%d|%s\n", buffer, clientIP, serv_conf.port, clip(get_date_time(tmp)));
+	logc(ACCESS,log_tmp);
 
 	strcpy(&request.virtual_path[0],&serv_conf.www_root[0]);
 	memset(tmp,0,4048);
@@ -1518,7 +1537,10 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	// Handle proxy relay.
 	if(serv_conf.v_proxys[0]!=NULL){
 	  if(handle_proxy(sockfd,&request)>-2){
-	  	return CONN_CLOSE;
+  	        free_request(&request);
+	        free(buffer);
+	        free(tmp);
+		return CONN_CLOSE;
 	  }
 	  if(c_debug) printf("No prixy match continuing\n");
 	}
@@ -1547,7 +1569,6 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	  close(sockfd);
 	  free(buffer);
 	  free(tmp);
-	 //return CONN_CLOSE;
 	}
 	if(c_debug) printf("[exit default page]\n");
 
@@ -1564,6 +1585,9 @@ int exec_request(SOCKET sockfd, char* clientIP, void* cSSL){
 	 if((ptr = get_header(&request,"Content-Length="))!=NULL){
 	  if(read_post_data(&request, atoi(ptr))==-1){
 	   send_internal_error2(&request);
+	   free_request(&request);
+	   free(buffer);
+	   free(tmp);
 	   return CONN_CLOSE;
 	  }
 	 }else request.post_data=NULL;

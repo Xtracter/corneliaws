@@ -23,7 +23,6 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _WEBS_CONF_
 
 #define ORG_SERVER_NAME "Cornelia"
-#define SOCKET unsigned int
 
 #define MAX_WWW_ROOT		256
 #define MAX_WORK_DIR		1024
@@ -57,8 +56,9 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <time.h>
 #include <crypt.h>
 #include <sys/stat.h>
+#include <errno.h>
 
-void handle_request(SOCKET sockfd, char* clientIP, void* cSSL);
+void handle_request(int sockfd, char* clientIP, void* cSSL);
 void set_user_proxy(char* cmd);
 
 typedef struct proxy_targets_t {
@@ -114,7 +114,7 @@ typedef struct content_type_t {
 
 typedef struct http_request_t {
 
-        SOCKET sockfd;
+	int   sockfd;
 	char  request[2048];
         char  method[12];
         char  file[256];
@@ -134,7 +134,7 @@ typedef struct http_request_t {
 
 typedef struct http_response_t {
 
-        SOCKET sockfd;
+        int sockfd;
         http_request* request;
         char  content_type[128];
         int   content_length;
@@ -204,8 +204,8 @@ void  dump_request(http_request* r);
 char* get_header(const http_request *request, const char* header);
 void  parse_headers(char* buffer, http_request* request);
 int   read_post_data(http_request *request, unsigned int len);
-void  handle_request(SOCKET sockfd, char* clientIP, void* cSSL);
-int   exec_request(SOCKET sockfd, char* clientIP, void* cSSL);
+void  handle_request(int sockfd, char* clientIP, void* cSSL);
+int   exec_request(int sockfd, char* clientIP, void* cSSL);
 void  free_request(http_request* r);
 void  free_response(http_response* r);
 void  parse_env(http_response* res);
@@ -217,9 +217,9 @@ int   socket_read(const http_request* request, char* buffer, int len);
 int   socket_write(const http_request* request, const char* buffer, int len);
 int   proxy_read(int sockfd, char* buffer, int len, void* cSSL);
 int   proxy_write(int sockfd, const char* buffer, int len, void* cSSL);
-int   exec_request(SOCKET sockfd, char* clientIP, void* cSSL);
+int   exec_request(int sockfd, char* clientIP, void* cSSL);
 void  check_conf(int use_ssl, int use_tls);
-int   handle_proxy(SOCKET sockfd, http_request* request);
+int   handle_proxy(int sockfd, http_request* request);
 int   proxy_connect(char* clientIP, int port);
 void  domain_to_ip(char* dest, const char* domain);
 int   is_regular_file(const server_conf* serv, const http_request* request);
