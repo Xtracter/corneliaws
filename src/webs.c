@@ -784,7 +784,6 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	    }
             get_head(response, headb, D_200_OK, 1);
             strcat(headb,"Transfer-Encoding: chunked\n");
-	    printf("About to chunk\n");
 	    n=socket_write(response->request, headb, strlen(headb));
 	    /*
 	    if((z = accept_encoding(response->request,"gzip"))){
