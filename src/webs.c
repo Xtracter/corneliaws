@@ -83,43 +83,6 @@ proxy_target* user_proxy_target = NULL;
 #define ERROR	    1
 #define ACCESS	    0
 
-int write_chunked(int fd, http_request* request, int gzip);
-
-int accept_encoding(const http_request* request, const char* enc);
-
-void usleep(unsigned long);
-
-int compress_stream(const unsigned char *input, size_t input_len,
-                    unsigned char *output, size_t *output_len);
-
-int getnameinfo(socklen_t hostlen, socklen_t servlen;
-                       const struct sockaddr *restrict addr, socklen_t addrlen,
-                       char host[],
-                       socklen_t hostlen,
-                       char serv[],
-                       socklen_t servlen,
-                       int flags);
-
-
-void logc(int type, const char* message){
-
-	FILE* fd;
-	char file[256];
-
-	if(type){
-	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ERROR_LOG);
-	}else{
-	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ACCESS_LOG);
-	}
-	if((fd=fopen(file,"a"))!=NULL){
-	  fwrite(message,1,strlen(message),fd);
-	  fclose(fd);
-	}else{
-	  printf("Err: Can't write to logfile: %s\n", file);
-	}
-}
-
-
 void init_server() {
 
 	int loop=1;
@@ -185,6 +148,24 @@ void init_server() {
 	  exit(-1);
         }
 
+}
+
+void logc(int type, const char* message){
+
+	FILE* fd;
+	char file[256];
+
+	if(type){
+	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ERROR_LOG);
+	}else{
+	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ACCESS_LOG);
+	}
+	if((fd=fopen(file,"a"))!=NULL){
+	  fwrite(message,1,strlen(message),fd);
+	  fclose(fd);
+	}else{
+	  printf("Err: Can't write to logfile: %s\n", file);
+	}
 }
 
 
@@ -1467,12 +1448,14 @@ void parse_env(http_response* res){
 	res->envp[n] = (char*)malloc(strlen(tmp)+1);
 	strcpy(res->envp[n], tmp);
 	n++;
+
 	if(res->request->cSSL!=NULL){
 	  sprintf(tmp,"HTTPS=true");
 	  res->envp[n] = (char*)malloc(strlen(tmp)+1);
 	  strcpy(res->envp[n], tmp);
 	  n++;
 	}
+
 	ip_to_domain(res->request->clientIP, res->request->clientDomain);
 	sprintf(tmp,"REMOTE_HOST=%s", res->request->clientDomain);
 	res->envp[n] = (char*)malloc(strlen(tmp)+1);
@@ -1489,11 +1472,15 @@ void parse_env(http_response* res){
 	strcpy(res->envp[n], tmp);
 	n++;
 
-	sprintf(tmp,"SERVER_SOFTWARE=%s %s", ORG_SERVER_NAME, ORG_SERVER_VERSION);
+	sprintf(tmp,"SERVER_PORT=%d", serv_conf.port);
 	res->envp[n] = (char*)malloc(strlen(tmp)+1);
 	strcpy(res->envp[n], tmp);
 	n++;
 
+	sprintf(tmp,"SERVER_SOFTWARE=%s %s", ORG_SERVER_NAME, ORG_SERVER_VERSION);
+	res->envp[n] = (char*)malloc(strlen(tmp)+1);
+	strcpy(res->envp[n], tmp);
+	n++;
 
 	free(tmp);
 }

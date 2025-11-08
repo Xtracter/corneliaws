@@ -179,6 +179,7 @@ typedef struct server_conf_t {
 
 } server_conf;
 
+void  logc(int type, const char* message);
 void  doPut(http_response* response);
 void  init_server();
 int   get_file_size(const http_request* request);
@@ -228,9 +229,19 @@ int   is_regular_file(const server_conf* serv, const http_request* request);
 int   accept_encoding(const http_request* request, const char* enc);
 user_endpoint* get_user_endpoint(char* argstr);
 virtual_host* get_virtual_host(char* host);
-/* Not very pretty but it will do for now...*/
 void  send_bad_request2(http_request* request);
 void  send_internal_error2(http_request* request);
-
+int   write_chunked(int fd, http_request* request, int gzip);
+int   accept_encoding(const http_request* request, const char* enc);
+void  usleep(unsigned long);
+int   compress_stream(const unsigned char *input, size_t input_len,
+                    unsigned char *output, size_t *output_len);
+int getnameinfo(socklen_t hostlen, socklen_t servlen;
+                       const struct sockaddr *restrict addr, socklen_t addrlen,
+                       char host[],
+                       socklen_t hostlen,
+                       char serv[],
+                       socklen_t servlen,
+                       int flags);
 #endif
 
