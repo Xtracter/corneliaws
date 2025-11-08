@@ -99,7 +99,7 @@ void logc(int type, const char* message){
 	if(type){
 	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ERROR_LOG);
 	}else{
-	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ERROR_LOG);
+	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ACCESS_LOG);
 	}
 	if((fd=fopen(file,"a"))!=NULL){
 	  fwrite(message,1,strlen(message),fd);
@@ -348,7 +348,7 @@ int readline(const http_request* request, char* buffer, int len){
 	fd.events = POLLIN;
 	ret = poll(&fd, 1, (serv_conf.keep_alive_timeout/1000));
 
-switch (ret) {
+	switch (ret) {
     	  case -1:
 	  case 0:
           return -1; // Socket timed out.
