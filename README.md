@@ -1,7 +1,7 @@
 
 <div >
 <a href="https://github.com/othneildrew/Best-README-Template">
-    <img src="www/corn2.png" alt="Logo" width="600" >
+    <img src="http://crazedout.com/corn2.png" alt="Logo" width="600" >
   </a>
  
 </div>
@@ -126,3 +126,4 @@ Cornelia also includes a home brewed simple version of JSP <a href="JSPZ.md">JSP
 <p/>
 
 Good Luck / Fredrik. 
+
