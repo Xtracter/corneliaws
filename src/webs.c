@@ -34,29 +34,30 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "../include/webs.h"
 
 #define SA struct sockaddr
-#define AUTH_REQUEST_SENT	0
-#define AUTH_OK			1
-#define BAD_AUTH		-1
-#define CGI_BIN	 		"/cgi-bin/"
+#define AUTH_REQUEST_SENT		0
+#define AUTH_OK				1
+#define BAD_AUTH			-1
+#define CGI_BIN	 			"/cgi-bin/"
 
-#define CONN_KEEP_ALIVE		1
-#define CONN_CLOSE		0
-#define MAX_ALLOC		65536
-#define MAX_FILE_PATH		4096
+#define CONN_KEEP_ALIVE			1
+#define CONN_CLOSE			0
+#define MAX_ALLOC			65536
+#define MAX_FILE_PATH			4096
 
-#define HTTP_POST		"POST"
-#define HTTP_GET		"GET"
-#define HTTP_PUT		"PUT"
-#define HTTP_DELETE		"DELETE"
-#define HTTP_HEAD		"HEAD"
-#define HTTP_OPTIONS		"OPTIONS"
-#define AUTHORIZATION 		"Authorization="
+#define HTTP_POST			"POST"
+#define HTTP_GET			"GET"
+#define HTTP_PUT			"PUT"
+#define HTTP_DELETE			"DELETE"
+#define HTTP_HEAD			"HEAD"
+#define HTTP_OPTIONS			"OPTIONS"
+#define AUTHORIZATION 			"Authorization="
 
 #define D_204_NO_CONTENT		"204 No Content"
 #define D_404_NOT_FOUND			"404 Not Found"
 #define D_200_OK			"200 OK"
 #define D_500_INTERNAL_SERVER_ERROR 	"500 Internal Server Error"
 #define D_400_FORBIDDEN 		"400 Forbidden"
+#define BUFF_SIZE 			5000
 
 
 int c_debug = 0;
@@ -217,7 +218,6 @@ int proxy_connect(char* clientIP, int port){
 
     return client_fd;
 }
-#define BUFF_SIZE 5000
 
 int handle_proxy(int sockfd, http_request* request){
 
@@ -260,7 +260,6 @@ int handle_proxy(int sockfd, http_request* request){
         if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
 	strcat(request->request,"\n");
         send(clientfd,request->request,strlen(request->request),0);
-	//proxy_write(clientfd,request->request,strlen(request->request),request->cSSL);
 	if(c_debug) printf("\n");
         for(int i=0;i<request->headers_len; i++){
                 memset(buffer,0,BUFF_SIZE);
@@ -277,10 +276,8 @@ int handle_proxy(int sockfd, http_request* request){
 		}
 		if(c_debug) printf("%s", buffer);
                 send(clientfd,buffer,strlen(buffer),0);
-		//proxy_write(clientfd,buffer,strlen(buffer),request->cSSL);
         }
         send(clientfd,"\n\n",2,0);
-        //proxy_write(clientfd,header,strlen(header),request->cSSL);
         while((r=read(clientfd,buffer,256))>0){
            r=proxy_write(sockfd,buffer,r,request->cSSL);
         }
