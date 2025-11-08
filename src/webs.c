@@ -747,26 +747,21 @@ int exec_cgi(http_response* response, const char* exe_ptr){
         sprintf(file_path,"%s%s%s",
 		&response->request->virtual_path[0],&response->request->path[0],&response->request->file[0]);
 
-	if(strstr(exe_ptr,"jgazm")!=NULL){
-	  strcpy(executable, exe_ptr);
-	  argv[0]=(char*)malloc(strlen(file_path)+1);
- 	  strcpy(argv[0],"-f");
-	  argv[1]=(char*)malloc(strlen(file_path)+1);
- 	  strcpy(argv[1],file_path);
-	  argv[2]=NULL;
-	}else if(strcmp(exe_ptr,"[shell]")!=0){
+	if(strcmp(exe_ptr,"[shell]")!=0){
 	  strcpy(executable, exe_ptr);
 	  argv[0]=(char*)malloc(strlen(file_path)+1);
  	  strcpy(argv[0],file_path);
 	  argv[1]=NULL;
 	}else{
 	  strcpy(executable, file_path);
-	  argv[0]=(char*)malloc(strlen(&file_path[0]));
- 	  strcpy(argv[0],&file_path[0]);
+	  argv[0]=(char*)malloc(strlen(file_path)+1);
+ 	  strcpy(argv[0],file_path);
 	  argv[1]=NULL;
 	}
 
-	  int ex=0;
+	printf(">%s\n",executable);
+
+	int ex=0;
         if ((pid=fork()) > 0){
           close(pipefd[0]);
           dup2(pin[0], 0);
@@ -774,7 +769,7 @@ int exec_cgi(http_response* response, const char* exe_ptr){
           dup2(pipefd[1], 2);
           close(pipefd[1]);
           if((ex=execve(executable, argv, response->envp))==-1){
-	   fprintf(stdout,"%s\n", executable);
+	   logc(ERROR, "Error in exec");
 	   abort=1;
 	  }
         }else if(pid==-1){
@@ -791,6 +786,7 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	    }
             get_head(response, headb, D_200_OK, 1);
             strcat(headb,"Transfer-Encoding: chunked\n");
+	    printf("About to chunk\n");
 	    n=socket_write(response->request, headb, strlen(headb));
 	    /*
 	    if((z = accept_encoding(response->request,"gzip"))){
