@@ -25,13 +25,13 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	/Fredrik.
 */
 
+#include "../include/webs.h"
 #include "../include/mkpasswd.h"
 #include "../include/tls.h"
 #include "../include/ssl.h"
 #include "../include/conf.h"
 #include "../include/misc.h"
 #include "../include/base64.h"
-#include "../include/webs.h"
 
 #define SA struct sockaddr
 #define AUTH_REQUEST_SENT		0
@@ -1079,20 +1079,31 @@ int handle_auth(http_request* request){
  return handled;
 }
 
-
 int allow_rest_path(const char* path){
 
-	//@TODO: Fix this to match each path.
+	char* ptr;
+	char copy[256];
+	int ret = 0;
+
+	memset(copy,0,256);
 	if(c_debug) printf("allow rest %s %s\n",path,serv_conf.rest_path);
-	if(strstr(serv_conf.rest_path,path)!=NULL) {
-	  if(c_debug) printf("['%s' is allowed for REST]\n",path);
-	  return 1;
+
+	strcpy(copy,serv_conf.rest_path);
+	ptr=strtok(copy,",");
+
+	while(ptr!=NULL){
+	  if(strcmp(ptr,path)==0) {
+	    ret=1;
+	    break;
+	  }
+	  ptr=strtok(NULL,",");
 	}
 
-	if(c_debug) printf("['%s' is not allowed for REST]\n",path);
+	if(c_debug) printf("%s\n", ret==1?"OK":"FAIL");
 
-  return 0;
+  return ret;
 }
+
 
 void doPut(http_response* response){
 
@@ -1321,6 +1332,7 @@ int parse_http(char* buffer, http_request* request){
 	}
 
 	if(c_debug) printf("[exit parse_http]\n");
+
  return res;
 }
 
@@ -1590,7 +1602,8 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 
 	// Handle directoery request without trailing '/'.
 	if(c_debug) printf("[handle dir request]\n");
-	if(!is_regular_file(&serv_conf, &request)){
+
+	if(!is_regular_file(&serv_conf, &request) && strcmp(request.method,HTTP_PUT)!=0 && strcmp(request.method,HTTP_DELETE)!=0){
 	  char* tmp = (char*)malloc(MAX_ALLOC);
 	  sprintf(tmp,"%s%s/",&request.path[0],&request.file[0]);
 	  request.file[0]='\0';
