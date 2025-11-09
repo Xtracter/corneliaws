@@ -62,6 +62,13 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 void handle_request(int sockfd, char* clientIP, void* cSSL);
 void set_user_proxy(char* cmd);
 
+typedef struct tls_client_t {
+
+	void* ctx;
+	void* ssl;
+
+} tls_client;
+
 typedef struct proxy_targets_t {
 
 	char host[256];
@@ -233,7 +240,7 @@ void  send_bad_request2(http_request* request);
 void  send_internal_error2(http_request* request);
 int   write_chunked(int fd, http_request* request, int gzip);
 int   accept_encoding(const http_request* request, const char* enc);
-void  usleep(unsigned long);
+//void  usleep(unsigned long);
 int   compress_stream(const unsigned char *input, size_t input_len,
                     unsigned char *output, size_t *output_len);
 int getnameinfo(socklen_t hostlen, socklen_t servlen;
@@ -243,5 +250,6 @@ int getnameinfo(socklen_t hostlen, socklen_t servlen;
                        char serv[],
                        socklen_t servlen,
                        int flags);
+
 #endif
 
