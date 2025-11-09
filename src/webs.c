@@ -1092,7 +1092,7 @@ int allow_rest_path(const char* path){
 	ptr=strtok(copy,",");
 
 	while(ptr!=NULL){
-	  if(strcmp(ptr,path)==0) {
+	  if(strcmp(ptr,path)==0 || strcmp(ptr,"*")==0) {
 	    ret=1;
 	    break;
 	  }
