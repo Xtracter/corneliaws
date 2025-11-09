@@ -121,7 +121,7 @@ https://github.com/openssl
 <b> ! You should of course replace the default cert/keys with your own using cert/make_ssl_cert and/or cert/make_tls_cert !</b>
 <p>
 Cornelia handles all default CGI such as plain c binaries, shell script, perl and so on.<br/>
-PHP is handled by php-cgi and *.jgazm by jGazm.<br>
+PHP is handled by php-cgi.
 Cornelia also includes a home brewed simple version of JSP <a href="JSPZ.md">JSPZ.md</a>.
 <p/>
 
