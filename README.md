@@ -35,7 +35,7 @@ set env CORNELIA_HOME to cornelia install dir.
 
 If you start bin/startup.sh from cornelia directory CORNELIA_HOME is set to pwd.
 
-Default HTTP port is 8080, SSL 8081, TLS 8082. Edit this in conf/corny.conf
+Default HTTP port is 8080, SSL/TLS 8443 and SSL/SSL 8444. Edit this in conf/corny.conf
 
 >make (or 'make no_ssl' for http only)<br/>
 >bin/startup.sh (may have to chmod 755 on *.sh files in /bin) starts http server.<br/>
@@ -108,10 +108,10 @@ In conf/corny:<br>
 
 <b>Proxy relaying:</b></br>
 By setting cmd line -proxy Cornelia acts as a proxy relaying all trafic to a different target.</br>
-><localhost>=<remote_host>:<port>:<type> (http or ssl) (host=host in browser address)</br>
+>localhost=remote_host:port:type (http or ssl) (host=host in browser address)</br>
 Example: -proxy:local_nickname=google.com:443:ssl<br>
 >By setting host to 'all'. All requests will be forwarded to new_host:port.
-The local host must be HTTP. Remote host can be HTTP or HTTPS
+The local host must be HTTP at this time. Remote host can be HTTP or HTTPS.
 </p>
 
 <b>OpenSSL:</b><br/>
