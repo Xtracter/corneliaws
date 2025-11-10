@@ -284,6 +284,26 @@ int proxy_connect(char* clientIP, int port){
 
 
 
+int p_ssl_write(void* ssl, const char* buffer, int len){
+
+	int r = 0;
+	#ifndef NO_SSL
+	r=ssl_write(ssl,buffer,len);
+	#endif
+
+  return r;
+}
+
+int p_ssl_read(void* ssl, char* buffer, int len){
+
+	int r = 0;
+	#ifndef NO_SSL
+	r=ssl_read(ssl,buffer,len);
+	#endif
+
+  return r;
+}
+
 int handle_proxy(int sockfd, http_request* request){
 
         int clientfd=0;
@@ -331,11 +351,13 @@ int handle_proxy(int sockfd, http_request* request){
         if(strlen(buffer)==0) return -2;
 
 	if(SSL) {
+	  #ifndef NO_SSL
 	  if(open_tls_socket(thost,tport,&tlsc)==-1){
 	   logc(ERROR, "tls con failed: %s %s\n", buffer, tport);
 	   free_client_socket(tlsc.ctx,tlsc.ssl);
 	   return -1;
 	  }
+	  #endif
 	}
         else {
 	  if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
@@ -344,7 +366,7 @@ int handle_proxy(int sockfd, http_request* request){
 	strcat(request->request,"\n");
 
         if(!SSL) send(clientfd,request->request,strlen(request->request),0);
-	else ssl_write(tlsc.ssl,request->request,strlen(request->request));
+	else p_ssl_write(tlsc.ssl,request->request,strlen(request->request));
 
 	if(c_debug) printf("\n");
         for(int i=0;i<request->headers_len; i++){
@@ -365,24 +387,28 @@ int handle_proxy(int sockfd, http_request* request){
 
 		if(!SSL) send(clientfd,buffer,strlen(buffer),0);
 	        else {
-		  r=ssl_write(tlsc.ssl,buffer,strlen(buffer));
+		  r=p_ssl_write(tlsc.ssl,buffer,strlen(buffer));
 		}
         }
 
         if(!SSL) send(clientfd,"\n\n",2,0);
-	else ssl_write(tlsc.ssl,"\n\n",2);
+	else p_ssl_write(tlsc.ssl,"\n\n",2);
 
 	if(!SSL){
           while((r=read(clientfd,buffer,256))>0){
 	    r=send(sockfd,buffer,r,0);
           }
 	}else{
-	  while((r=ssl_read(tlsc.ssl,buffer,256))>0){
+	  while((r=p_ssl_read(tlsc.ssl,buffer,256))>0){
 	    r=send(sockfd,buffer,r,0);
 	  }
 	}
 
-	if(SSL) free_client_socket(tlsc.ctx,tlsc.ssl);
+	if(SSL) {
+	  #ifndef NO_SSL
+	  free_client_socket(tlsc.ctx,tlsc.ssl);
+	  #endif
+	}
         else close(clientfd);
 
         return 0;
@@ -2025,7 +2051,7 @@ int main(int args, char* argv[]){
 
 	memset(&serv_conf,0,sizeof(server_conf));
 	memset(&a_conf,0,sizeof(auth_conf));
-	if(c_debug) printf("Debug mode is on\n");
+	if(c_debug) printf("\nDebug mode is on\n");
 
 	if(init_conf(&conf_file[0], &serv_conf)>-1){
 
