@@ -58,6 +58,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <crypt.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <stdarg.h>
 
 void handle_request(int sockfd, char* clientIP, void* cSSL);
 void set_user_proxy(char* cmd);
@@ -74,6 +75,7 @@ typedef struct proxy_targets_t {
 	char host[256];
 	char proxy_host[256];
 	int proxy_port;
+	char type[8];
 
 } proxy_target;
 
@@ -186,7 +188,7 @@ typedef struct server_conf_t {
 
 } server_conf;
 
-void  logc(int type, const char* message);
+void  logc(int type, const char* string, ...);
 void  doPut(http_response* response);
 void  init_server();
 int   get_file_size(const http_request* request);
@@ -226,7 +228,7 @@ char* encode_url(unsigned char* url, char* url_enc);
 int   socket_read(const http_request* request, char* buffer, int len);
 int   socket_write(const http_request* request, const char* buffer, int len);
 int   proxy_read(int sockfd, char* buffer, int len, void* cSSL);
-int   proxy_write(int sockfd, const char* buffer, int len, void* cSSL);
+int   proxy_write(int sockfd, const char* buffer, int len, void* cSSL, void* pSSL);
 int   exec_request(int sockfd, char* clientIP, void* cSSL);
 void  check_conf(int use_ssl, int use_tls);
 int   handle_proxy(int sockfd, http_request* request);

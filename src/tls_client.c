@@ -26,7 +26,7 @@ struct addrinfo {
 int getaddrinfo(const char* hostname, const char* service, const struct addrinfo* hints, struct addrinfo* res[]);
 void freeaddrinfo(struct addrinfo *ai);
 
-int open_tls_socket(const char* host, const char* port, tls_client* tls, const char* cert, const char* key) {
+int open_tls_socket(const char* host, const char* port, tls_client* tls) {
 
     SSL_library_init();
     SSL_load_error_strings();
@@ -39,33 +39,32 @@ int open_tls_socket(const char* host, const char* port, tls_client* tls, const c
         return 1;
     }
 
-    configure_context(ctx,cert,key);
-
     struct addrinfo hints,*res;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
+    printf("connect: %s %s\n",host,port);
     if (getaddrinfo(host, port, &hints, &res) != 0) {
-        perror("getaddrinfo");
+        printf("err getaddrinfo\n");
         SSL_CTX_free(ctx);
         return -1;
     }
 
     int sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sock < 0) {
-        perror("socket");
+        printf("err socket\n");
         freeaddrinfo(res);
         SSL_CTX_free(ctx);
-        return -11;
+        return -1;
     }
 
     if (connect(sock, res->ai_addr, res->ai_addrlen) != 0) {
-        perror("connect");
+        printf("err connect\n");
         close(sock);
         freeaddrinfo(res);
         SSL_CTX_free(ctx);
-        return -11;
+        return -1;
     }
 
     freeaddrinfo(res);
@@ -84,6 +83,7 @@ int open_tls_socket(const char* host, const char* port, tls_client* tls, const c
         SSL_free(ssl);
         close(sock);
         SSL_CTX_free(ctx);
+	printf("err connect\n");
         return -1;
     }
 

@@ -362,6 +362,11 @@ void read_proxy_targets(FILE* fd, server_conf *serv){
 				ptr=strtok(NULL,":");
 				serv->v_proxys[n]->proxy_port=atoi(ptr);
 			}
+			if((ptr=strtok(NULL,":"))!=NULL){
+			  sprintf(serv->v_proxys[n]->type,"%s",ptr);
+			}else{
+			  sprintf(serv->v_proxys[n]->type,"%s","http");
+			}
 		}
 		n++;
 		serv->v_proxys[n]=NULL;

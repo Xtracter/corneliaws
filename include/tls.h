@@ -24,5 +24,5 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "webs.h"
 void init_tls_server(const server_conf* serv_conf);
 void free_client_socket(void* ctx, void* ssl);
-int open_tls_socket(const char* host, const char* port, tls_client* tls, const char* cert, const char* key);
+int open_tls_socket(const char* host, const char* port, tls_client* tls);
 #endif

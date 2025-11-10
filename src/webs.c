@@ -65,7 +65,7 @@ int dump_req=0;
 server_conf serv_conf;
 auth_conf   a_conf;
 
-char  log_tmp[256];
+char log_tmp[3072];
 char* bad_request;
 char* internal_server_error;
 char* unauthorized;
@@ -121,6 +121,7 @@ void init_server() {
 
 	  connfd = accept(sockfd, (SA*)&cli, &len);
 	  if(connfd==-1){
+	  char log_tmp[64];
 	  sprintf(log_tmp,"Client socket failed. errno %d\n", errno);
 	   logc(ERROR, log_tmp);
            continue;
@@ -150,10 +151,11 @@ void init_server() {
 
 }
 
-void logc(int type, const char* message){
+void logc(int type, const char* string, ...){
 
 	FILE* fd;
 	char file[256];
+	va_list args;
 
 	if(type){
 	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ERROR_LOG);
@@ -161,7 +163,10 @@ void logc(int type, const char* message){
 	  sprintf(file,"%s/%s",getenv("CORNELIA_HOME"),ACCESS_LOG);
 	}
 	if((fd=fopen(file,"a"))!=NULL){
-	  fwrite(message,1,strlen(message),fd);
+	  for (va_start(args, string); *string != '\0'; ++string){
+ 	    fwrite(string,1,strlen(string),fd);
+	  }
+	  fwrite("\n",1,0,fd);
 	  fclose(fd);
 	}else{
 	  printf("Err: Can't write to logfile: %s\n", file);
@@ -277,16 +282,23 @@ int proxy_connect(char* clientIP, int port){
     return client_fd;
 }
 
+
+
 int handle_proxy(int sockfd, http_request* request){
 
-        int clientfd;
+        int clientfd=0;
         char* tok;
         char buffer[BUFF_SIZE];
         char header[1024];
         char rem_host[256];
         int rem_port=0,r,n;
 	char proxy_host[256];
+	tls_client tlsc;
+	char tport[8];
+	char thost[256];
+	int SSL=1;
 
+	memset(&tlsc,0,sizeof(tls_client));
         memset(buffer,0,BUFF_SIZE);
         memset(header,0,1024);
 
@@ -306,24 +318,41 @@ int handle_proxy(int sockfd, http_request* request){
                 if(strcmp(rem_host,serv_conf.v_proxys[n]->host)==0 ||
                         strcmp("all", serv_conf.v_proxys[n]->host)==0) {
                         domain_to_ip(buffer,serv_conf.v_proxys[n]->proxy_host);
+			strcpy(thost, serv_conf.v_proxys[n]->proxy_host);
+	 		sprintf(tport,"%d",rem_port);
                         rem_port = serv_conf.v_proxys[n]->proxy_port;
 			strcpy(proxy_host, serv_conf.v_proxys[n]->proxy_host);
+			if(strcmp(serv_conf.v_proxys[n]->type,"http")==0) SSL=0;
                         break;
                 }
                 n++;
         }
-	if(c_debug) printf("Proxy: %s %d\n", buffer, (int)strlen(buffer));
+	if(c_debug) printf("Proxy: %s %d mode:%s\n", buffer, rem_port, (SSL==0?"http":"ssl"));
         if(strlen(buffer)==0) return -2;
 
-        if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
+	if(SSL) {
+	  if(open_tls_socket(thost,tport,&tlsc)==-1){
+	   logc(ERROR, "tls con failed: %s %s\n", buffer, tport);
+	   free_client_socket(tlsc.ctx,tlsc.ssl);
+	   return -1;
+	  }
+	}
+        else {
+	  if((int)(clientfd = proxy_connect(buffer,rem_port))==-1) return -1;
+	}
+
 	strcat(request->request,"\n");
-        send(clientfd,request->request,strlen(request->request),0);
+
+        if(!SSL) send(clientfd,request->request,strlen(request->request),0);
+	else ssl_write(tlsc.ssl,request->request,strlen(request->request));
+
 	if(c_debug) printf("\n");
         for(int i=0;i<request->headers_len; i++){
                 memset(buffer,0,BUFF_SIZE);
 		if(strstr(request->headers[i],"Connection=")!=NULL){
                   sprintf(buffer,"Connection: close\n");
-		}else if(strstr(request->headers[i],"Host=")!=NULL){
+		}
+		else if(strstr(request->headers[i],"Host=")!=NULL){
 		  if(rem_port!=80){
                     sprintf(buffer,"Host: %s:%d\n", proxy_host,rem_port);
 		  }else{
@@ -333,23 +362,38 @@ int handle_proxy(int sockfd, http_request* request){
                   sprintf(buffer,"%s\n",str_replace(request->headers[i],"=",": "));
 		}
 		if(c_debug) printf("%s", buffer);
-                send(clientfd,buffer,strlen(buffer),0);
-        }
-        send(clientfd,"\n\n",2,0);
-        while((r=read(clientfd,buffer,256))>0){
-           r=proxy_write(sockfd,buffer,r,request->cSSL);
+
+		if(!SSL) send(clientfd,buffer,strlen(buffer),0);
+	        else {
+		  r=ssl_write(tlsc.ssl,buffer,strlen(buffer));
+		}
         }
 
-        close(clientfd);
+        if(!SSL) send(clientfd,"\n\n",2,0);
+	else ssl_write(tlsc.ssl,"\n\n",2);
+
+	if(!SSL){
+          while((r=read(clientfd,buffer,256))>0){
+	    r=send(sockfd,buffer,r,0);
+          }
+	}else{
+	  while((r=ssl_read(tlsc.ssl,buffer,256))>0){
+	    r=send(sockfd,buffer,r,0);
+	  }
+	}
+
+	if(SSL) free_client_socket(tlsc.ctx,tlsc.ssl);
+        else close(clientfd);
 
         return 0;
 }
+
 
 int get_file_size(const http_request* request){
 
         FILE *fd;
         int   size=-1;
-        char  *tmp = (char*)malloc(MAX_ALLOC);
+        char  tmp[4096];
         sprintf(tmp,"%s%s%s",&request->virtual_path[0],&request->path[0],&request->file[0]);
 
 	 if((fd=fopen(tmp,"rb"))!=NULL){
@@ -358,7 +402,6 @@ int get_file_size(const http_request* request){
            fseek(fd,0L,SEEK_SET);
            fclose(fd);
         }
-        free(tmp);
 
 return size;
 }
@@ -430,32 +473,6 @@ int readline(const http_request* request, char* buffer, int len){
  return n;
 }
 
-int proxy_write(int sockfd, const char* buffer, int len, void* cSSL){
-
-	int r = 0;
-	if(cSSL==NULL){
-	  r=write(sockfd, buffer, len);
-	}else{
-	 #ifndef NO_SSL
-	 r=ssl_write(cSSL, buffer, len);
-	 #endif
-	}
-
-  return r;
-}
-
-int proxy_read(int sockfd, char* buffer, int len, void* cSSL){
-
-	int r = 0;
-	if(cSSL==NULL){
-	  r=read(sockfd, buffer, len);
-	}else{
-	  #ifndef NO_SSL
-	  r=ssl_read(cSSL, buffer, len);
-	  #endif
-	}
-  return r;
-}
 
 int socket_read(const http_request* request, char* buffer, int len){
 
@@ -487,7 +504,7 @@ int socket_write(const http_request* request, const char* buffer, int len){
 
 void send_bad_request(http_response* response, char* code){
 	if(c_debug) printf("[send bad request]\n");
-     	char* buffer=(char*)malloc(4000);
+     	char buffer[4096];
 	response->content_length=strlen(bad_request);
 	strcpy(&response->content_type[0],"text/html");
         get_head(response, &buffer[0], code,0);
@@ -495,13 +512,12 @@ void send_bad_request(http_response* response, char* code){
 	socket_write(response->request,"\r\n",2);
         socket_write(response->request, bad_request, strlen(bad_request));
 	socket_write(response->request, "\n\n",2);
-	free(buffer);
 }
 
 void send_bad_request2(http_request* request){
 
 	if(c_debug) printf("[send bad request 2]\n");
-        char* buffer=(char*)malloc(4000);
+        char buffer[4096];
         http_response response;
         response.request=request;
         response.content_length=strlen(bad_request);
@@ -513,7 +529,6 @@ void send_bad_request2(http_request* request){
         socket_write(request, bad_request, strlen(bad_request));
 	socket_write(request, "\n\n",2);
 
-        free(buffer);
 }
 
 
@@ -521,25 +536,23 @@ void send_forbidden(http_request* request){
 
 	if(c_debug) printf("[send forbidden]\n");
 
-     	char* buffer=(char*)malloc(4000);
+     	char buffer[4096];
 	http_response response;
 	response.request=request;
         response.content_length=strlen(forbidden);
         strcpy(&response.content_type[0],"text/html");
         get_head(&response, &buffer[0], D_400_FORBIDDEN,0);
-
 	socket_write(request, &buffer[0], strlen(&buffer[0]));
         socket_write(request,"\r\n",2);
         socket_write(request, forbidden, strlen(forbidden));
 	socket_write(request, "\n\n",2);
 
-	free(buffer);
 }
 
 void send_internal_error(http_response* response){
 
 	if(c_debug) printf("[send internal error]\n");
-     	char* buffer=(char*)malloc(4000);
+     	char buffer[4096];
         response->content_length=strlen(internal_server_error);
         strcpy(&response->content_type[0],"text/html");
         get_head(response, &buffer[0], D_500_INTERNAL_SERVER_ERROR, 0);
@@ -547,14 +560,13 @@ void send_internal_error(http_response* response){
         socket_write(response->request,"\r\n",2);
         socket_write(response->request, internal_server_error, strlen(internal_server_error));
 	socket_write(response->request, "\n\n",2);
-	free(buffer);
 }
 
 
 void send_internal_error2(http_request* request){
 
 	if(c_debug) printf("[send internal error 2]\n");
-     	char* buffer=(char*)malloc(4000);
+     	char buffer[4096];
 	http_response response;
 	response.request=request;
         response.content_length=strlen(forbidden);
@@ -564,7 +576,6 @@ void send_internal_error2(http_request* request){
         socket_write(response.request,"\r\n",2);
         socket_write(response.request, internal_server_error, strlen(internal_server_error));
 	socket_write(response.request, "\n\n",2);
-	free(buffer);
 }
 
 
@@ -572,12 +583,13 @@ void list_dir (const char* dir, char* buffer) {
 
    DIR *dp;
    struct dirent *ep;
-   char* tmp = (char*)malloc(1024);
-   char* fold = (char*)malloc(MAX_ALLOC);
-   char* reg = (char*)malloc(MAX_ALLOC);
+   char tmp[1024];
+   char fold[4096];
+   char reg[4096];
 
    memset(tmp, 0, 1024);
-   memset(fold,0, MAX_ALLOC);   memset(reg, 0, MAX_ALLOC);
+   memset(fold,0, 2048);
+   memset(reg, 0, 2048);
 
    dp = opendir (dir);
    if (dp != NULL){
@@ -598,7 +610,7 @@ void list_dir (const char* dir, char* buffer) {
         }
       }
 
-      if(strlen(buffer)+strlen(fold)>MAX_ALLOC){
+      if(strlen(buffer)+strlen(fold)>sizeof(fold)){
 	 int size=strlen(buffer)+strlen(fold)+1;
 	 buffer=(char*)realloc(buffer, size);
          strcat(buffer, fold);
@@ -606,7 +618,7 @@ void list_dir (const char* dir, char* buffer) {
 	strcat(buffer,fold);
       }
 
-      if(strlen(buffer)+strlen(reg)>MAX_ALLOC){
+      if(strlen(buffer)+strlen(reg)>sizeof(reg)){
 	 int size=strlen(buffer)+strlen(reg)+1;
 	 buffer=(char*)realloc(buffer, size);
          strcat(buffer, reg);
@@ -620,22 +632,19 @@ void list_dir (const char* dir, char* buffer) {
     perror ("Couldn't open the directory for listing");
   }
 
-  free(reg);
-  free(fold);
-  free(tmp);
-
 }
 
 void send_list_dir(http_request* request){
 
-	char* buffer = (char*)malloc(MAX_ALLOC);
-	char* dir = (char*)malloc(MAX_ALLOC);
-	char* tmp = (char*)malloc(MAX_ALLOC);
+	int size = 1024;
+	char buffer[size];
+	char dir[size];
+	char tmp[size];
 	char head[] = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: text/html\r\n";
 
-	memset(buffer,0,MAX_ALLOC);
-	memset(dir,0,MAX_ALLOC);
-	memset(tmp,0,MAX_ALLOC);
+	memset(buffer,0,size);
+	memset(dir,0,size);
+	memset(tmp,0,size);
 
 	sprintf(dir,"%s/%s%s%s", &serv_conf.workdir[0], &request->virtual_path[0], &request->path[0], &request->file[0]);
 	if(file_exists(dir)){
@@ -655,10 +664,6 @@ void send_list_dir(http_request* request){
 	  send_bad_request2(request);
 	}
 
-	free(tmp);
-	free(buffer);
-	free(dir);
-
 }
 
 
@@ -667,9 +672,9 @@ int find_default_page(http_request* request){
 	if(strstr(request->method,HTTP_PUT)!=NULL) return 1;
 
 	char* ptr;
-	char* fi = (char*)malloc(MAX_ALLOC);
+	char fi[4096];
+	char tmp[strlen(&serv_conf.default_page[0])+1];
 	int found=0;
-	char* tmp = (char*)malloc(strlen(&serv_conf.default_page[0])+1);
 
 
 	strcpy(tmp,&serv_conf.default_page[0]);
@@ -678,22 +683,17 @@ int find_default_page(http_request* request){
  	  sprintf(fi, "%s/%s%s%s", &serv_conf.workdir[0], &request->virtual_path[0], &request->path[0], ptr);
 	  if(file_exists(fi)) {
 	   strcpy(&request->file[0],ptr);
-	   found=1;
-	   goto ret; // Yes i'm using goto - so sue me!
+	   return 1;
 	  }
 	}
 	while((ptr=strtok(NULL,","))!=NULL){
 	 sprintf(fi, "%s/%s%s%s", &serv_conf.workdir[0], &request->virtual_path[0], &request->path[0],ptr);
 	  if(file_exists(fi)) {
 	   strcpy(&request->file[0],ptr);
-	   found=1;
-	   goto ret;
+	   return 1;
 	  }
 	}
 
- ret:
-	free(fi);
-	free(tmp);
 
  return found;
 }
@@ -787,8 +787,8 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	char* argv[128];
 
         char headb[2048];
-        char *file_path = (char*)malloc(MAX_ALLOC);
-	char *executable = (char*)malloc(1024);
+        char file_path[4096];
+	char executable[1024];
 	int  clen=0;
 
         int pipefd[2];
@@ -825,7 +825,7 @@ int exec_cgi(http_response* response, const char* exe_ptr){
           dup2(pipefd[1], 2);
           close(pipefd[1]);
           if((ex=execve(executable, argv, response->envp))==-1){
-	   logc(ERROR, "Error in exec");
+	   logc(ERROR, "Error in exec:", executable);
 	   abort=1;
 	  }
         }else if(pid==-1){
@@ -858,8 +858,6 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	  close(pin[1]);
 	}
 
-        free(file_path);
-        free(executable);
         n = 0;
         while(1){
 	 if(argv[n]==NULL) break;
@@ -1007,7 +1005,7 @@ int get_user_pass_from_file(const char* file, const char* base64){
 
 	FILE* fd;
 	int ret=0;
-	char *buffer = (char*)malloc(128);
+	char buffer[128];
 	if((fd=fopen(file,"r"))!=NULL){
 	 while((fgets(buffer, 128, fd))!=NULL){
 	  if(strcmp(clip(buffer), base64)==0){
@@ -1016,7 +1014,6 @@ int get_user_pass_from_file(const char* file, const char* base64){
  	 }
 	 fclose(fd);
 	}
-	free(buffer);
 
  return ret;
 }
@@ -1024,8 +1021,8 @@ int get_user_pass_from_file(const char* file, const char* base64){
 int handle_auth(http_request* request){
 
 	 int len;
-	 char* tmp = (char*)malloc(2024);
-	 char* cmp = (char*)malloc(1024);
+	 char tmp[2048];
+	 char cmp[2050];
 	 int handled=AUTH_OK;
 	 char* basic;
 	 int n = 0;
@@ -1045,14 +1042,10 @@ int handle_auth(http_request* request){
 		if((strstr(&serv_conf.auth[n]->base64auth[0],".passwd"))!=NULL){
 		  sprintf(tmp,"%s/conf/%s", &serv_conf.workdir[0], &serv_conf.auth[n]->base64auth[0]);
 	          if(get_user_pass_from_file(tmp, cmp)){
-		    free(cmp);
-		    free(tmp);
 		   return AUTH_OK;
 		}
 		}else{
 		  if(strcmp(&serv_conf.auth[n]->base64auth[0],cmp)==0){
-		    free(cmp);
-		    free(tmp);
 		   return AUTH_OK;
 		}
 	      }
@@ -1072,9 +1065,6 @@ int handle_auth(http_request* request){
 	  }
   	  n++;
 	}
-
-	free(cmp);
-	free(tmp);
 
  return handled;
 }
@@ -1371,9 +1361,9 @@ void parse_headers(char* buffer, http_request* request){
 
 	char* ptr;
 	int  index;
-	char* name=(char*)malloc(128);
-	char* value=(char*)malloc(1024);
-	char* tmp=(char*)malloc(MAX_ALLOC);
+	char name[128];
+	char value[1024];
+	char tmp[4096];
 
 	if((ptr=strstr(buffer,":"))!=NULL){
 	  index=ptr-buffer;
@@ -1387,19 +1377,14 @@ void parse_headers(char* buffer, http_request* request){
 	}
 	request->headers[request->headers_len]=NULL;
 
-	free(tmp);
-	free(name);
-	free(value);
 }
 
 void parse_env(http_response* res){
 
 	int n = 0;
-	char *tmp;
+	char tmp[4096+1024];
 	char buff[1024];
 	char cpy[1024];
-
-	tmp = (char*)malloc(6048);
 
 	while(1){
 	  memset(&buff[0],0,1024);
@@ -1494,7 +1479,6 @@ void parse_env(http_response* res){
 	strcpy(res->envp[n], tmp);
 	n++;
 
-	free(tmp);
 }
 
 int read_post_data(http_request *request, unsigned int len){
@@ -1524,8 +1508,8 @@ int read_post_data(http_request *request, unsigned int len){
 virtual_host* get_virtual_host(char* host){
 
 	int n = 0;
-	char* tmp = (char*)malloc(256);
-	char* htmp = (char*)malloc(256);
+	char tmp[256];
+	char htmp[256];
 	virtual_host* h_ptr = NULL;
 	char *ptr;
 
@@ -1543,8 +1527,6 @@ virtual_host* get_virtual_host(char* host){
 	  }
 	 n++;
 	}
-	free(htmp);
-	free(tmp);
 
  return h_ptr;
 }
@@ -1570,8 +1552,8 @@ void handle_request(int sockfd, char* clientIP, void* cSSL){
 int exec_request(int sockfd, char* clientIP, void* cSSL){
 
 	int r=0;
-	char* buffer = (char*)malloc(2048);
-	char* tmp = (char*)malloc(4096);
+	char buffer[2048];
+	char tmp[4096];
 	int n = 0;
 	char* ptr;
 	char* host;
@@ -1593,7 +1575,7 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 	if(c_debug) printf("[readline]\n");
 
 	sprintf(log_tmp,"%s|%s|%d|%s\n", buffer, clientIP, serv_conf.port, clip(get_date_time(tmp)));
-	logc(ACCESS,log_tmp);
+	logc(ACCESS, log_tmp);
 
 	strcpy(&request.virtual_path[0],&serv_conf.www_root[0]);
 	memset(tmp,0,4048);
@@ -1604,11 +1586,9 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 	if(c_debug) printf("[handle dir request]\n");
 
 	if(!is_regular_file(&serv_conf, &request) && strcmp(request.method,HTTP_PUT)!=0 && strcmp(request.method,HTTP_DELETE)!=0){
-	  char* tmp = (char*)malloc(MAX_ALLOC);
 	  sprintf(tmp,"%s%s/",&request.path[0],&request.file[0]);
 	  request.file[0]='\0';
 	  strcpy(request.path,tmp);
-	  free(tmp);
 	  parse_h=-1;
 	}
 
@@ -1632,8 +1612,6 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 	if(serv_conf.v_proxys[0]!=NULL){
 	  if(handle_proxy(sockfd,&request)>-2){
   	        free_request(&request);
-	        free(buffer);
-	        free(tmp);
 		return CONN_CLOSE;
 	  }
 	  if(c_debug) printf("No prixy match continuing\n");
@@ -1661,8 +1639,6 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 	    send_forbidden(&request);
 	  }
 	  close(sockfd);
-	  free(buffer);
-	  free(tmp);
 	}
 	if(c_debug) printf("[exit default page]\n");
 
@@ -1680,8 +1656,6 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 	  if(read_post_data(&request, atoi(ptr))==-1){
 	   send_internal_error2(&request);
 	   free_request(&request);
-	   free(buffer);
-	   free(tmp);
 	   return CONN_CLOSE;
 	  }
 	 }else request.post_data=NULL;
@@ -1697,8 +1671,6 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 
 	(void)(r);
 	free_request(&request);
-	free(buffer);
-	free(tmp);
 
  return ret;
 }
@@ -1715,13 +1687,12 @@ int accept_encoding(const http_request* request, const char* enc){
 
 int is_regular_file(const server_conf* serv, const http_request* request) {
 
-    char* path = (char*)malloc(MAX_ALLOC);
+    char path[MAX_FILE_PATH];
 
     sprintf(path, "%s/%s%s%s", serv->workdir, request->virtual_path, request->path, request->file);
 
     struct stat path_stat;
     stat(path, &path_stat);
-    free(path);
 
     return S_ISREG(path_stat.st_mode);
 }
@@ -1947,6 +1918,12 @@ void set_user_proxy(char* cmd){
 	    strcpy(user_proxy_target->proxy_host,ptr);
 	    user_proxy_target->proxy_port=atoi(strtok(NULL,":"));
 	  }
+	  if((ptr=strtok(NULL,":"))!=NULL){
+	    sprintf(user_proxy_target->type,"%s", ptr);
+	  }
+	  else {
+	    sprintf(user_proxy_target->type,"%s","http");
+	  }
 	}
 
 }
@@ -1982,7 +1959,7 @@ int main(int args, char* argv[]){
 	int  user_tsl_port=0;
 	int  dump_c=0;
 	char *ptr;
-	char* dir = (char*)malloc(1024);
+	char dir[1024];
 	int use_ssl=0;
 	int use_tls=0;
 
@@ -1994,7 +1971,6 @@ int main(int args, char* argv[]){
 	  printf("Asuming: %s - Lets's try it..\n", dir);
 	  setenv("CORNELIA_HOME",dir,1);
 	}
-	free(dir);
 
 	if(args>1){
 
