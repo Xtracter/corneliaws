@@ -29,9 +29,10 @@ echo "* (c) CrazedoutSoft 2022 - 2025 Fredrik Roos  *"
 echo "***********************************************"
 
 
-if [[ $1 == "" ]];
+if [[ $1 != "http" ]] && [[ $1 != "ssk" ]] && [[ $1 != "tls" ]] && [[ $1 != "all" ]];
 then
-$CORNELIA_HOME/bin/cornelia_d $2 $3 -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d $1 $2 $3 -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d -tls $1 $2 $3 -c  $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 if [[ $1 == "http" ]];
@@ -53,7 +54,7 @@ if [[ $1 == "all" ]];
 then
 $CORNELIA_HOME/bin/cornelia_d -http $2 -c  $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 $CORNELIA_HOME/bin/cornelia_d -ssl $2 -c  $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
-$CORNELIA_HOME/bin/cornelia_d -tls $2 -c  $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
+$CORNELIA_HOME/bin/cornelia_d -ssl $2 -c $2 $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 
