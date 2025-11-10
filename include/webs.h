@@ -202,7 +202,7 @@ void  list_dir (const char* dir, char* buffer);
 void  send_list_dir(http_request* request);
 int   find_default_page(http_request* request);
 char* get_content_type(char* file, char* ct);
-char* get_head(http_response* response, char* head, char* code, int skipcl);
+char* get_head(http_response* response, char* head, char* code, int skipcl, int skipct);
 int   exec_cgi(http_response* response, const char* exe_ptr);
 int   write_plain_file(const http_response* response, int len, char*path, char* fil);
 char* getExecutable(const char* file);

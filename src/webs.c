@@ -440,6 +440,7 @@ int readline_ssl(const http_request* request, char* buffer, int len){
 	int r=0;
 
           while((r=socket_read(request,&sb[0],1))>0 && n<len-1){
+	   printf("%c",sb[0]);
 	   if(r==-1) {
 	    return -1;
 	   }
@@ -452,7 +453,6 @@ int readline_ssl(const http_request* request, char* buffer, int len){
             buffer[n++] = c;
           }
 	  if(n==0) buffer[0]='\0';
-
 
  return n;
 }
@@ -533,7 +533,7 @@ void send_bad_request(http_response* response, char* code){
      	char buffer[4096];
 	response->content_length=strlen(bad_request);
 	strcpy(&response->content_type[0],"text/html");
-        get_head(response, &buffer[0], code,0);
+        get_head(response, &buffer[0], code,0,0);
 	socket_write(response->request, &buffer[0], strlen(&buffer[0]));
 	socket_write(response->request,"\r\n",2);
         socket_write(response->request, bad_request, strlen(bad_request));
@@ -548,7 +548,7 @@ void send_bad_request2(http_request* request){
         response.request=request;
         response.content_length=strlen(bad_request);
         strcpy(&response.content_type[0],"text/html");
-        get_head(&response, &buffer[0], D_404_NOT_FOUND,0);
+        get_head(&response, &buffer[0], D_404_NOT_FOUND,0,0);
 
         socket_write(request, &buffer[0], strlen(&buffer[0]));
         socket_write(request,"\r\n",2);
@@ -567,7 +567,7 @@ void send_forbidden(http_request* request){
 	response.request=request;
         response.content_length=strlen(forbidden);
         strcpy(&response.content_type[0],"text/html");
-        get_head(&response, &buffer[0], D_400_FORBIDDEN,0);
+        get_head(&response, &buffer[0], D_400_FORBIDDEN,0,0);
 	socket_write(request, &buffer[0], strlen(&buffer[0]));
         socket_write(request,"\r\n",2);
         socket_write(request, forbidden, strlen(forbidden));
@@ -581,7 +581,7 @@ void send_internal_error(http_response* response){
      	char buffer[4096];
         response->content_length=strlen(internal_server_error);
         strcpy(&response->content_type[0],"text/html");
-        get_head(response, &buffer[0], D_500_INTERNAL_SERVER_ERROR, 0);
+        get_head(response, &buffer[0], D_500_INTERNAL_SERVER_ERROR, 0,0);
         socket_write(response->request, &buffer[0], strlen(&buffer[0]));
         socket_write(response->request,"\r\n",2);
         socket_write(response->request, internal_server_error, strlen(internal_server_error));
@@ -597,7 +597,7 @@ void send_internal_error2(http_request* request){
 	response.request=request;
         response.content_length=strlen(forbidden);
         strcpy(response.content_type,"text/html");
-        get_head(&response, buffer, D_500_INTERNAL_SERVER_ERROR, 0);
+        get_head(&response, buffer, D_500_INTERNAL_SERVER_ERROR, 0,0);
         socket_write(response.request, &buffer[0], strlen(&buffer[0]));
         socket_write(response.request,"\r\n",2);
         socket_write(response.request, internal_server_error, strlen(internal_server_error));
@@ -746,7 +746,7 @@ char* get_content_type(char* file, char* ct){
 	}
 
 	if(!all_ok) {
-	  strcpy(ct,"text/text");
+	  strcpy(ct,"text/html");
 	}
 
 	// TODO: Bad fix for type="module"
@@ -758,12 +758,12 @@ char* get_content_type(char* file, char* ct){
 }
 
 
-char* get_head(http_response* response, char* head, char* code, int skipcl){
+char* get_head(http_response* response, char* head, char* code, int skipcl, int skipct){
 
 	char tmp[1024];
 	char date[64];
 
-	memset(head,0,1024);
+	memset(head,0,4096);
 	memset(date,0,64);
 
 	get_formated_date(date,64);
@@ -793,8 +793,10 @@ char* get_head(http_response* response, char* head, char* code, int skipcl){
 	  sprintf(tmp,"%s", ACAOrigin);
 	  strcat(head,tmp);
 	}
-	sprintf(tmp,"%s: %s\n", "Content-Type", &response->content_type[0]);
-	strcat(head,tmp);
+	if(!skipct){
+	  sprintf(tmp,"%s: %s\n", "Content-Type", &response->content_type[0]);
+	  strcat(head,tmp);
+	}
 	if(!skipcl){
 	  sprintf(tmp,"%s: %d\n", "Content-Length", response->content_length);
 	  strcat(head,tmp);
@@ -866,10 +868,16 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	      r=write(pin[1], response->request->post_data, clen);
 	      if(c_debug) printf("[post_data_written: %d]\n",r);
 	    }
-            get_head(response, headb, D_200_OK, 1);
-            strcat(headb,"Transfer-Encoding: chunked\n");
+            //get_head(response, headb, D_200_OK, 1, 1);
+	    sprintf(headb,"HTTP/1.1 %s\n", D_200_OK);
 	    n=socket_write(response->request, headb, strlen(headb));
-	    /*
+	    sprintf(headb,"Server: Cornelia 1.3\n");
+	    n=socket_write(response->request, headb, strlen(headb));
+	    sprintf(headb,"Connection: close\n");
+	    n=socket_write(response->request, headb, strlen(headb));
+            sprintf(headb,"Transfer-Encoding: chunked\n");
+	    n=socket_write(response->request, headb, strlen(headb));
+            /*
 	    if((z = accept_encoding(response->request,"gzip"))){
               memset(headb,0,2048);
 	      sprintf(headb,"Content-Encoding: gzip\n");
@@ -891,55 +899,52 @@ int exec_cgi(http_response* response, const char* exe_ptr){
         }
 
 	if(abort) {
-		printf("Aboirt\n");
+		printf("Abort\n");
 		send_internal_error(response);
 
 	}
 
  return n;
 }
-/*
-int compress_stream(const unsigned char *input, size_t input_len,
-                    unsigned char *output, size_t *output_len)
-*/
 
 int write_chunked(int fd, http_request* request, int gzip){
-
 
 	int r=0;
 	int n=0;
 	char line[64];
-	unsigned char buffer[CHUNK_SIZE];
-	unsigned char comp[CHUNK_SIZE];
+	char buffer[CHUNK_SIZE];
+	char comp[CHUNK_SIZE];
 	size_t c_len;
 
 	http_request tmp_request;
 
 	tmp_request.sockfd=fd;
-	tmp_request.cSSL = request->cSSL;
+	tmp_request.cSSL = NULL;//request->cSSL;
 
-	// Read head;
+	// Read cgi head;
+	memset(buffer,0,256);
 	while(1){
-	  n=readline(&tmp_request, (char*)buffer, CHUNK_SIZE);
-	  strcat((char*)buffer,"\n");
-	  n=socket_write(request, (char*)buffer, strlen((char*)buffer));
+	  n=readline(&tmp_request, buffer, 256);
+	  strcat(buffer,"\n");
+	  n=socket_write(request, buffer, strlen(buffer));
 	  if(n<3) break;
 	}
+
 	memset(buffer,0,CHUNK_SIZE);
 	memset(comp,0,CHUNK_SIZE);
 
 	while((r=read(fd,buffer, CHUNK_SIZE))){
 	  if(gzip){
-	    n=compress_stream(buffer,r,comp,&c_len);
+	    n=compress_stream((unsigned char*)buffer,r,(unsigned char*)comp,&c_len);
 	    if(dump_req) printf("gzip:%d %d %zu\n", n, r, c_len);
 	    r=c_len;
 	  }
 	  sprintf(line,"%X\r\n",r);
 	  n=socket_write(request, line, strlen(line));
           if(gzip) {
-	    n=socket_write(request, (char*)comp, r);
+	    n=socket_write(request, comp, r);
 	  }else{
-	    n=socket_write(request, (char*)buffer, r);
+	    n=socket_write(request, buffer, r);
           }
   	  n=socket_write(request, "\r\n", 2);
 	}
@@ -1143,7 +1148,7 @@ void doPut(http_response* response){
 	    printf("Bad Post data length\n");
 	  }
 	  fclose(fd);
-	  get_head(response,head,D_200_OK, 1);
+	  get_head(response,head,D_200_OK, 1,0);
 	  strcat(head,"\n");
 	  socket_write(response->request,head,strlen(head));
 	}else{
@@ -1170,7 +1175,7 @@ void doDelete(http_response* response){
 	if(remove(file_path)!=0){
 	  send_forbidden(response->request);
 	}else{
-	  get_head(response,head,D_200_OK, 1);
+	  get_head(response,head,D_200_OK, 1,0);
 	  strcat(head,"\n");
 	  socket_write(response->request,head,strlen(head));
 	}
@@ -1183,7 +1188,7 @@ int doHead(http_response* response){
 	char buffer[1024];
 
 	if(c_debug) printf("[do head]\n");
-	get_head(response, buffer, D_200_OK, 0);
+	get_head(response, buffer, D_200_OK, 0,0);
 	strcat(buffer,"\n");
 	return socket_write(response->request,buffer,strlen(buffer));
 
@@ -1194,7 +1199,7 @@ int doOptions(http_response* response){
 	char buffer[1024];
 
 	if(c_debug) printf("[do options]\n");
-	get_head(response, buffer, D_204_NO_CONTENT, 1);
+	get_head(response, buffer, D_204_NO_CONTENT, 1,0);
 	strcat(buffer,"\n");
 	return socket_write(response->request,buffer,strlen(buffer));
 
@@ -1245,7 +1250,7 @@ void doGetPost(http_request *request){
 	  }else if((exe_ptr=getExecutable(request->file)) || strcmp(&response.request->method[0],HTTP_POST)==0){
 	    exec_cgi(&response, exe_ptr);
 	  }else{
-	    get_head(&response,&tmp[0], D_200_OK, 0);
+	    get_head(&response,&tmp[0], D_200_OK, 0,0);
 	    socket_write(request,&tmp[0],strlen(tmp));
 	    if(write_plain_file(&response, response.content_length,
 	        &request->path[0], &request->file[0])==-1){
@@ -1969,7 +1974,7 @@ void usage(){
 	printf("-i \tprints config\n");
 	printf("-d \tdebug mode\n");
 	printf("-head \tprint request headers to stdout\n");
-	printf("-proxy\tset up proxy target [-proxy:host=relay_host:port]\n");
+	printf("-proxy\tset up proxy target [-proxy:<local_host>=<remote_host>:<port>:<type> (http or ssl)]\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"name\\\":\\\"value\\\"}%%application/json\n");
 	printf("                        [-uep:/myendpoint%%file:myjson.js%%application/json\n");
 	printf("                        Content-Type defaults to 'application/json' if omitted.\n");
