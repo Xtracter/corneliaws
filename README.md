@@ -110,7 +110,7 @@ In conf/corny:<br>
 By setting cmd line -proxy Cornelia acts as a proxy relaying all trafic to a different target.</br>
 >localhost=remote_host:port:type (http or ssl) (host=host in browser address)</br>
 Example: -proxy:local_nickname=google.com:443:ssl<br>
->By setting host to 'all'. All requests will be forwarded to new_host:port.
+>By setting host to 'all'. All requests will be forwarded to new_host:port.<br>
 The local host must be HTTP at this time. Remote host can be HTTP or HTTPS.
 </p>
 
