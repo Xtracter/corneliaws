@@ -107,10 +107,11 @@ In conf/corny:<br>
 <p>
 
 <b>Proxy relaying:</b></br>
-By setting config [proxy_targets] Cornlia acts as a proxy relaying all trafik to a different target.</br>
-host=new_host:port (host=host in browser address)</br>
-By setting host to 'all'. All requests will be forwarded to new_host:port.
-The target host must be plain HTTP.
+By setting config [proxy_targets] Cornelia acts as a proxy relaying all trafik to a different target.</br>
+>localhost>=<remote_host>:<port>:<type> (http or ssl) (host=host in browser address)</br>
+Example: -proxy:local_nickname=google.com:443:ssl<br>
+>By setting host to 'all'. All requests will be forwarded to new_host:port.
+The local host must be HTTP. Remote host can be HTTP or HTTPS
 </p>
 
 <b>OpenSSL:</b><br/>
