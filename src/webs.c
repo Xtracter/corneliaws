@@ -868,21 +868,15 @@ int exec_cgi(http_response* response, const char* exe_ptr){
 	      r=write(pin[1], response->request->post_data, clen);
 	      if(c_debug) printf("[post_data_written: %d]\n",r);
 	    }
-            //get_head(response, headb, D_200_OK, 1, 1);
-	    sprintf(headb,"HTTP/1.1 %s\n", D_200_OK);
+            get_head(response, headb, D_200_OK, 1, 1);
+	    strcat(headb,"Transfer-Encoding: chunked\n");
 	    n=socket_write(response->request, headb, strlen(headb));
-	    sprintf(headb,"Server: Cornelia 1.3\n");
-	    n=socket_write(response->request, headb, strlen(headb));
-	    sprintf(headb,"Connection: close\n");
-	    n=socket_write(response->request, headb, strlen(headb));
-            sprintf(headb,"Transfer-Encoding: chunked\n");
-	    n=socket_write(response->request, headb, strlen(headb));
-            /*
+	    // TODO: Make gzip and chunked work.
 	    if((z = accept_encoding(response->request,"gzip"))){
               memset(headb,0,2048);
 	      sprintf(headb,"Content-Encoding: gzip\n");
   	      n=socket_write(response->request, headb, strlen(headb));
-	    }*/
+	    }
 	    n=write_chunked(pipefd[0], response->request,z);
 	  }
 
@@ -1709,8 +1703,12 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 int accept_encoding(const http_request* request, const char* enc){
 
 	char* head = get_header(request,"Accept-Encoding=");
+	char* ptr;
 	if(head!=NULL){
-	  return strstr(head,enc)!=NULL;
+	  ptr = strstr(head,enc);
+	  if(ptr!=NULL) return 1;
+	  head = get_header(request,"Accept=");
+	  return strstr(head, "*/")!=NULL;
 	}
 
   return 0;
