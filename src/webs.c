@@ -59,7 +59,6 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define D_400_FORBIDDEN 		"400 Forbidden"
 #define BUFF_SIZE 			5000
 
-
 int c_debug = 0;
 int dump_req=0;
 server_conf serv_conf;
@@ -871,12 +870,14 @@ int exec_cgi(http_response* response, const char* exe_ptr){
             get_head(response, headb, D_200_OK, 1, 1);
 	    strcat(headb,"Transfer-Encoding: chunked\n");
 	    n=socket_write(response->request, headb, strlen(headb));
-	    // TODO: Make gzip and chunked work.
+	    // TODO: Make gzip/chunked work.
+	    /*
 	    if((z = accept_encoding(response->request,"gzip"))){
               memset(headb,0,2048);
 	      sprintf(headb,"Content-Encoding: gzip\n");
   	      n=socket_write(response->request, headb, strlen(headb));
 	    }
+	    */
 	    n=write_chunked(pipefd[0], response->request,z);
 	  }
 
@@ -961,7 +962,8 @@ int write_plain_file(const http_response* response, int len, char*path, char* fi
 	int z = 0;
 	unsigned char tmp[size+1];
 
-	int gzip = 0;//accept_encoding(response->request,"gzip");
+	int gzip = 0; //accept_encoding(response->request,"gzip"); - gzip/chunked malfunctions at this time.
+
 	if(gzip){
 	  socket_write(response->request,enc,strlen(enc));
 	}
@@ -1200,7 +1202,7 @@ int doOptions(http_response* response){
 }
 
 
-void doGetPost(http_request *request){
+void exec_response(http_request *request){
 
 	char tmp[1024];
 	char ext[128];
@@ -1689,8 +1691,8 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 	if(c_debug) printf("exit [content-length]\n");
 
 	request.headers_len=n-1;
-	doGetPost(&request);
-	if(c_debug) printf("exit [dogetpost]\n");
+	exec_response(&request);
+	if(c_debug) printf("exit [exec_response]\n");
 
 	if(strcmp(&request.connection[0],"keep-alive")==0) ret = CONN_KEEP_ALIVE;
 
@@ -1702,16 +1704,17 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 
 int accept_encoding(const http_request* request, const char* enc){
 
+	int ret=0;
 	char* head = get_header(request,"Accept-Encoding=");
-	char* ptr;
+
 	if(head!=NULL){
-	  ptr = strstr(head,enc);
-	  if(ptr!=NULL) return 1;
-	  head = get_header(request,"Accept=");
-	  return strstr(head, "*/")!=NULL;
+	  ret = strstr(head,enc)!=NULL;
+	}
+	if((head=get_header(request,"Accept="))!=NULL){
+	  ret = strstr(head,ACCESS_ALL)!=NULL;
 	}
 
-  return 0;
+  return ret;
 }
 
 int is_regular_file(const server_conf* serv, const http_request* request) {

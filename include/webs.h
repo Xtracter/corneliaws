@@ -42,6 +42,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MAX_ENV_VARS		256
 #define MAX_QUERYSTRING	 	2048
 
+#define ACCESS_ALL              "*/*"
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -209,7 +211,7 @@ char* getExecutable(const char* file);
 char* get_user(const char* basic, char* buff);
 int   get_user_pass_from_file(const char* file, const char* base64);
 int   handle_auth(http_request* request);
-void  doGetPost(http_request *request);
+void  exec_response(http_request *request);
 int   handle_virtual_files(http_request* request);
 int   parse_http(char* buffer, http_request* request);
 void  dump_request(http_request* r);
@@ -252,6 +254,7 @@ int getnameinfo(socklen_t hostlen, socklen_t servlen;
                        char serv[],
                        socklen_t servlen,
                        int flags);
+
 
 #endif
 
