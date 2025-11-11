@@ -83,9 +83,9 @@ typedef struct proxy_targets_t {
 
 typedef struct user_endpoint_t {
 
-        char* endpoint;
-        char* response;
-        char* content_type;
+        char endpoint[256];
+        char response[256];
+        char content_type[128];
 
 } user_endpoint;
 

@@ -32,7 +32,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define VHOSTS_CONF		"[virtual_hosts]"
 #define VHOSTS_FILES		"[virtual_files]"
 #define VPROXYS_CONF		"[proxy_targets]"
-#define UEP_CONF		"[endpoints]"
+#define UEP_CONF		"[user_endpoints]"
 
 void print_server_conf(server_conf* serv){
 
@@ -128,15 +128,26 @@ void print_server_conf(server_conf* serv){
         }
         printf("[virtual_files]\n\n");
 
-		printf("[proxy_targets]\n");
-		n=0;
-		while(1){
-			if(serv->v_proxys[n]==NULL) break;
-			printf("%s=%s:%d\n", serv->v_proxys[n]->host, serv->v_proxys[n]->proxy_host, serv->v_proxys[n]->proxy_port);
-			n++;
-		}
-		printf("[proxy_targets]\n");
+	printf("[proxy_targets]\n");
+	n=0;
+	while(1){
+		if(serv->v_proxys[n]==NULL) break;
+		printf("%s=%s:%d\n", serv->v_proxys[n]->host, serv->v_proxys[n]->proxy_host, serv->v_proxys[n]->proxy_port);
+		n++;
+	}
+	printf("[proxy_targets]\n\n");
+
+	printf("[user_enpoints]\n");
+	n = 0;
+	while(1){
+	 if(serv->uep[n]==NULL) break;
+	 printf("%s%c%s%c%s\n", serv->uep[n]->endpoint, '%', serv->uep[n]->response, '%', serv->uep[n]->content_type);
+	 n++;
+	}
+	printf("[user_enpoints]\n\n");
+
 }
+
 
 void read_server_conf(FILE* fd, server_conf* serv){
 
@@ -230,7 +241,6 @@ void read_auth_conf(FILE* fd, server_conf *serv){
     while(fgets(buffer,1024,fd)!=NULL){
 
 	if(buffer[0]=='#' || strlen(buffer)==0) continue;
-
         if(strcmp(clip(buffer),AUTH_CONF)==0) break;
 	if(strlen(buffer)==0) continue;
 	else if((ptr=strstr(buffer, "auth.realms="))!=NULL){
@@ -299,7 +309,6 @@ user_endpoint* get_user_endpoint(char* argstr){
 
    while((token = strtok(NULL, "%"))!=NULL){
     if(n==0){
-      uep->endpoint = (char*)malloc(strlen(token));
       strcpy(uep->endpoint, token);
     }else if(n==1){
       if((ptr=strstr(token,"file:"))!=NULL){
@@ -311,22 +320,18 @@ user_endpoint* get_user_endpoint(char* argstr){
           r=fread(ptr,fd_len,1,fd);
           (void)(r);
           fclose(fd);
-          uep->response = (char*)malloc(strlen(ptr));
           strcpy(uep->response, ptr);
           free(ptr);
         }else fprintf(stderr,"Bad uep file\n");
       }else {
-        uep->response = (char*)malloc(strlen(token));
         strcpy(uep->response, token);
-        printf("token: %s\n", token);
       }
     }else if(n==2){
-      uep->content_type = (char*)malloc(strlen(token));
       strcpy(uep->content_type, token);
     }
    n++;
   }
-
+  /*
   if(uep->endpoint==NULL || uep->response==NULL){
         printf("User enpoint must have at least 'enpoint' and 'response' defined.\n");
         printf("Format: -uep:/myendpoint\%%{\\\"name\\\":\\\"value\\\"}\%%application/json\n");
@@ -335,7 +340,7 @@ user_endpoint* get_user_endpoint(char* argstr){
         printf("No correct eup defined\n");
   }else{
         printf("Listening on endpoint:%s, reply %s\n", uep->endpoint, uep->content_type!=NULL?uep->content_type:"application/json");
-  }
+  }*/
 
   free(arg);
 
@@ -353,20 +358,20 @@ void read_proxy_targets(FILE* fd, server_conf *serv){
 		if(buffer[0]=='#') continue;
 		ptr=strtok(buffer,"=");
 		if(ptr!=NULL){
-			serv->v_proxys[n]=(proxy_target*)malloc(sizeof(proxy_target));
-			memset(serv->v_proxys[n],0,sizeof(proxy_target));
-			strcpy(serv->v_proxys[n]->host,ptr);
-			ptr=strtok(NULL,":");
-			if(ptr!=NULL){
-				strcpy(serv->v_proxys[n]->proxy_host,ptr);
-				ptr=strtok(NULL,":");
-				serv->v_proxys[n]->proxy_port=atoi(ptr);
-			}
-			if((ptr=strtok(NULL,":"))!=NULL){
-			  sprintf(serv->v_proxys[n]->type,"%s",ptr);
-			}else{
-			  sprintf(serv->v_proxys[n]->type,"%s","http");
-			}
+		  serv->v_proxys[n]=(proxy_target*)malloc(sizeof(proxy_target));
+		  memset(serv->v_proxys[n],0,sizeof(proxy_target));
+		  strcpy(serv->v_proxys[n]->host,ptr);
+		  ptr=strtok(NULL,":");
+		  if(ptr!=NULL){
+		    strcpy(serv->v_proxys[n]->proxy_host,ptr);
+		    ptr=strtok(NULL,":");
+		    serv->v_proxys[n]->proxy_port=atoi(ptr);
+		  }
+		  if((ptr=strtok(NULL,":"))!=NULL){
+		    sprintf(serv->v_proxys[n]->type,"%s",ptr);
+		  }else{
+		    sprintf(serv->v_proxys[n]->type,"%s","http");
+		  }
 		}
 		n++;
 		serv->v_proxys[n]=NULL;
@@ -398,6 +403,7 @@ void read_content_types(FILE* fd, server_conf *serv){
 	  n++;
 	 }
 	}
+	serv->content_types[n]=NULL;
     }
 
     free(buffer);
@@ -502,7 +508,100 @@ void read_vfiles(FILE* fd, server_conf* serv){
         free(tmp);
 }
 
-int init_conf(const char* conf_file, server_conf *serv){
+void add_user_endpoint(user_endpoint* user_ep, server_conf* serv){
+
+	int n = 0;
+
+	while(serv->uep[n++]!=NULL){
+	}
+	serv->uep[n]=user_ep;
+	serv->uep[n+1]=NULL;
+
+	n=0;
+	while(serv->uep[n++]!=NULL){
+	  printf("uep:%s\n", serv->uep[n]->endpoint);
+	}
+
+}
+
+
+
+void read_user_endpoints(FILE* fd, server_conf* serv){
+
+        int n = 0;
+        char buffer[1024];
+        char mem[1024];
+        char* ptr;
+
+        while(fgets(buffer,1024,fd)!=NULL){
+
+          if(strcmp(clip(buffer),UEP_CONF)==0) break;
+          if(buffer[0]=='#') continue;
+          if(strlen(buffer)==0) continue;
+
+          strcpy(mem, buffer);
+	  serv->uep[n] = (user_endpoint*)malloc(sizeof(user_endpoint));
+	  memset(serv->uep[n],0,sizeof(user_endpoint));
+
+	  ptr = strtok(mem,"%");
+
+	  if(ptr!=NULL){
+	    strcpy(serv->uep[n]->endpoint,ptr);
+	    if((ptr=strtok(NULL,"%"))!=NULL){
+	      strcpy(serv->uep[n]->response,ptr);
+	      if((ptr=strtok(NULL,"%"))!=NULL){
+	        strcpy(serv->uep[n]->content_type,ptr);
+	      }else strcpy(serv->uep[n]->content_type,"application/json");
+	    }
+	  }
+	n++;
+      }
+      serv->uep[n]=NULL;
+}
+
+void free_conf(server_conf* serv){
+
+
+	int n = 0;
+	while(serv->v_proxys[n]!=NULL){
+	  free(serv->v_proxys[n]);
+	  n++;
+	}
+	n=0;
+	while(serv->content_types[n]!=NULL){
+	  free(serv->content_types[n]);
+	  n++;
+	}
+	n=0;
+	while(serv->exec_c[n]!=NULL){
+	  free(serv->exec_c[n]);
+	  n++;
+	}
+	n=0;
+	while(serv->auth[n]!=NULL){
+	  free(serv->auth[n]);
+	  n++;
+	}
+	n=0;
+	while(serv->v_hosts[n]!=NULL){
+	  free(serv->v_hosts[n]);
+	  n++;
+	}
+	n=0;
+	while(serv->v_files[n]!=NULL){
+	  free(serv->v_files[n]);
+	  n++;
+	}
+	n=0;
+	while(serv->uep[n]!=NULL){
+	  free(serv->uep[n]);
+	  n++;
+	}
+
+	memset(serv,0,sizeof(server_conf));
+}
+
+int init_conf(const char* conf_file, server_conf* serv){
 
     char* buffer = (char*)malloc(1024);
     FILE* fd;
@@ -515,6 +614,7 @@ int init_conf(const char* conf_file, server_conf *serv){
 	  else if(strcmp(clip(buffer),VHOSTS_CONF)==0) read_vhosts(fd,serv);
 	  else if(strcmp(clip(buffer),VHOSTS_FILES)==0) read_vfiles(fd,serv);
 	  else if(strcmp(clip(buffer),VPROXYS_CONF)==0) read_proxy_targets(fd,serv);
+	  else if(strcmp(clip(buffer),UEP_CONF)==0) read_user_endpoints(fd,serv);
 	}
      fclose(fd);
     }else{
@@ -528,14 +628,13 @@ int init_conf(const char* conf_file, server_conf *serv){
  return 0;
 }
 
+void reload_conf(const char* conf_file, server_conf* serv){
 
-void free_conf(server_conf* serv){
-
-	int n = 0;
-	while(serv->v_proxys[n]!=NULL){
-		printf("Freeing: v_proxys[%d]\n",n);
-		free(serv->v_proxys[n]);
-		n++;
-	}
+	free_conf(serv);
+	init_conf(conf_file,serv);
 
 }
+
+
+
+

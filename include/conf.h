@@ -25,4 +25,6 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 int init_conf(const char* conf_file, server_conf* serv);
 void free_conf(server_conf* serv);
 void print_server_conf(server_conf* serv);
+void free_conf(server_conf* serv);
+void reload_conf(const char* config_file, server_conf* serv);
 #endif

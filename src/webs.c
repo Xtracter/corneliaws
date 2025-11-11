@@ -61,6 +61,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 int c_debug = 0;
 int dump_req=0;
+int conf_time=0;
 server_conf serv_conf;
 auth_conf   a_conf;
 
@@ -73,8 +74,9 @@ char* ACAOrigin;
 char  conf_file[1024] = "conf/corny.conf";
 char  cip[16];
 void dump_request(http_request* r);
-user_endpoint* user_uep;
 proxy_target* user_proxy_target = NULL;
+void add_user_endpoint(user_endpoint*, server_conf* serv);
+void confc(int init);
 
 #define CHUNK_SIZE 4096
 #define ACCESS_LOG "log/access.log"
@@ -116,9 +118,10 @@ void init_server() {
         len = sizeof(cli);
         printf("\nCornelia listening on %d [HTTP]\n", serv_conf.port);
 
+	confc(0);
         while(loop){
-
 	  connfd = accept(sockfd, (SA*)&cli, &len);
+	  confc(1);
 	  if(connfd==-1){
 	  char log_tmp[64];
 	  sprintf(log_tmp,"Client socket failed. errno %d\n", errno);
@@ -147,6 +150,26 @@ void init_server() {
 	  perror("Fatal:Server accept failed.\n");
 	  exit(-1);
         }
+
+}
+
+void confc(int init){
+
+	struct stat attr;
+	time_t* t;
+
+	if (stat(conf_file, &attr) == 0) {
+	  t=&attr.st_mtime;
+	  if(conf_time<(int)time(t)){
+	    conf_time=(int)time(t);
+	    if(init){
+	     reload_conf(conf_file,&serv_conf);
+	     printf("%s reloaded\n", conf_file);
+	    }
+	  }
+	} else {
+	  logc(ERROR, "Can't stat conf file..");
+	}
 
 }
 
@@ -1258,61 +1281,79 @@ void exec_response(http_request *request){
 
 }
 
-int handle_virtual_files(http_request* request){
+int handle_user_enpoints(http_request* request){
 
-	char* virt;
-	int n = 0;
 	int res=0;
+	int n=0;
 	char* tmp;
 	char* origins = (char*)malloc(4096);
+	user_endpoint* uep;
 
-	while(1){
-	  if(serv_conf.v_files[n]!=NULL){
-	    virt = (char*)malloc(strlen(&request->path[0])+strlen(&request->file[0])+2);
-	    sprintf(virt,"%s%s",&request->path[0],&request->file[0]);
-	    if(strcmp(virt,&serv_conf.v_files[n]->name[0])==0){
-	      sprintf(&request->path[0],"%s",&serv_conf.v_files[n]->path[0]);
-	      sprintf(&request->file[0],"%s",&serv_conf.v_files[n]->file[0]);
+	if(c_debug) printf("[parse uep]\n");
+	tmp = (char*)malloc(strlen(&request->path[0]));
+	sprintf(tmp,"%s%s", &request->path[0], &request->file[0]);
+	while((uep=serv_conf.uep[n++])!=NULL){
+	  if(strcmp(tmp,uep->endpoint)==0){
+	    if(c_debug) printf("[start uep]\n");
+	    if(c_debug) printf("eup:%s %s\n", tmp, uep->endpoint);
+	    socket_write(request,"HTTP/1.1 200 OK\n",16);
+	    socket_write(request,"Server: Cornelia\n",17);
+	    socket_write(request,"Connection: close\n",18);
+
+	    if(strlen(ACAOrigin)>0){
+	     sprintf(origins,"%s", ACAOrigin);
+	     socket_write(request,origins,(int)strlen(origins));
 	    }
-	   free(virt);
+
+	    tmp = (char*)realloc(tmp,255);
+	    if(uep->content_type!=NULL){
+	      sprintf(tmp,"Content-Type: %s\n", uep->content_type);
+	    }else sprintf(tmp,"Content-Type: application/json\n");
+	    socket_write(request, tmp, strlen(tmp));
+
+	    if(uep->response!=NULL) {
+	      tmp = realloc(tmp,128);
+	      sprintf(tmp,"Content-Length: %d\n\n", (int)strlen(uep->response));
+	      socket_write(request, tmp, strlen(tmp));
+	      tmp = realloc(tmp,strlen(uep->response)+2);
+ 	      sprintf(tmp,"%s", uep->response);
+	      socket_write(request, tmp, strlen(tmp));
+	   }
+ 	  res=1;
+	  break;
+	}
+	if(c_debug) printf("[end parse uep]\n");
+	}
+
+	free(origins);
+  	free(tmp);
+
+ return res;
+
+}
+
+int handle_virtual_files(http_request* request){
+
+	int n = 0;
+	int res=0;
+	char virt[MAX_FILE_PATH];
+
+	if(c_debug) printf("[start virtual files]\n");
+ 	while(1){
+	  if(serv_conf.v_files[n]!=NULL){
+	    sprintf(virt,"%s%s",&request->path[0],&request->file[0]);
+	    if(strcmp(virt,serv_conf.v_files[n]->name)==0){
+	      sprintf(request->path,"%s",serv_conf.v_files[n]->path);
+	      sprintf(request->file,"%s",serv_conf.v_files[n]->file);
+	      printf("virt: %s%s", request->path, request->file);
+	      res=1;
+	      break;
+	    }
 	  }else break;
 	 n++;
 	}
 
-	if(c_debug) printf("[start uep %d]\n", user_uep==NULL);
-	tmp = (char*)malloc(strlen(&request->path[0])+strlen(&request->file[0])+2);
-	sprintf(tmp,"%s%s", &request->path[0],&request->file[0]);
-	if(user_uep!=NULL && strcmp(tmp,user_uep->endpoint)==0){
-	  if(c_debug) printf("[start uep]\n");
-	  if(c_debug) printf("eup:%s %s\n", tmp, user_uep->endpoint);
-	  socket_write(request,"HTTP/1.1 200 OK\n",16);
-	  socket_write(request,"Server: Cornelia\n",17);
-	  socket_write(request,"Connection: close\n",18);
-
-	  if(strlen(ACAOrigin)>0){
-	  	sprintf(origins,"%s", ACAOrigin);
-		socket_write(request,origins,(int)strlen(origins));
-	  }
-
-	  tmp = (char*)realloc(tmp,255);
-	  if(user_uep->content_type!=NULL){
-	   sprintf(tmp,"Content-Type: %s\n", user_uep->content_type);
-	  }else sprintf(tmp,"Content-Type: application/json\n");
-	  socket_write(request, tmp, strlen(tmp));
-
-	  if(user_uep->response!=NULL) {
-	    tmp = realloc(tmp,128);
-	    sprintf(tmp,"Content-Length: %d\n\n", (int)strlen(user_uep->response));
-	    socket_write(request, tmp, strlen(tmp));
-	    tmp = realloc(tmp,strlen(user_uep->response)+2);
- 	    sprintf(tmp,"%s", user_uep->response);
-	    socket_write(request, tmp, strlen(tmp));
-	  }
- 	 res=1;
-	 if(c_debug) printf("[end uep]\n");
-	}
-	free(origins);
-  	free(tmp);
+	if(c_debug) printf("[end virtual files: %d]\n",res);
 
  return res;
 }
@@ -1340,9 +1381,7 @@ int parse_http(char* buffer, http_request* request){
 	  strcpy(&request->path[0], &serv_conf.cgi_bin[0]);
 	}
 
-	if(c_debug) printf("[start virtual_files]%s %s\n", &request->path[0], &request->file[0]);
-	res = handle_virtual_files(request);
-	if(c_debug) printf("[end virtual_files]%s %s\n", &request->path[0], &request->file[0]);
+	if(handle_virtual_files(request) && c_debug) printf("Virtual file is active\n");
 
 	if(strlen(&request->file[0])==0) {
 	    return -1;
@@ -1612,6 +1651,11 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 	// Handle directoery request without trailing '/'.
 	if(c_debug) printf("[handle dir request]\n");
 
+	// Handle user_enpoints
+	if(handle_user_enpoints(&request)==1){
+	  return CONN_CLOSE;
+	}
+
 	if(!is_regular_file(&serv_conf, &request) && strcmp(request.method,HTTP_PUT)!=0 && strcmp(request.method,HTTP_DELETE)!=0){
 	  sprintf(tmp,"%s%s/",&request.path[0],&request.file[0]);
 	  request.file[0]='\0';
@@ -1877,68 +1921,6 @@ void check_conf(int use_ssl, int use_tls){
 
 }
 
-/*
-user_endpoint* get_user_endpoint(char* argstr){
-
-  int n = 0;
-  char* token;
-  char* ptr;
-  char* arg = (char*)malloc(strlen(argstr)+1);
-  FILE* fd;
-  int r=0;
-  long fd_len=0;
-  strcpy(arg, argstr);
-
-  user_endpoint* uep = (user_endpoint*)malloc(sizeof(user_endpoint));
-  memset(uep,0,sizeof(user_endpoint));
-
-  token = strtok(arg, ":");
-
-   while((token = strtok(NULL, "%"))!=NULL){
-    if(n==0){
-      uep->endpoint = (char*)malloc(strlen(token));
-      strcpy(uep->endpoint, token);
-    }else if(n==1){
-      if((ptr=strstr(token,"file:"))!=NULL){
-	if((fd=fopen(ptr+5,"r"))!=NULL){
-	  fseek(fd,0,SEEK_END);
-	  fd_len=ftell(fd);
-	  fseek(fd,0,SEEK_SET);
-	  ptr = (char*)malloc(fd_len+1);
-	  r=fread(ptr,fd_len,1,fd);
-	  (void)(r);
-	  fclose(fd);
-	  uep->response = (char*)malloc(strlen(ptr));
-	  strcpy(uep->response, ptr);
-	  free(ptr);
-	}else fprintf(stderr,"Bad uep file\n");
-      }else {
-        uep->response = (char*)malloc(strlen(token));
-	strcpy(uep->response, token);
-	printf("token: %s\n", token);
-      }
-    }else if(n==2){
-      uep->content_type = (char*)malloc(strlen(token));
-      strcpy(uep->content_type, token);
-    }
-    n++;
-   }
-
-  if(uep->endpoint==NULL || uep->response==NULL){
-        printf("User enpoint must have at least 'enpoint' and 'response' defined.\n");
-        printf("Format: -uep:/myendpoint\%%{\\\"name\\\":\\\"value\\\"}\%%application/json\n");
-        printf("Format: -uep:/myendpoint\%%file:myjson.js\%%application/json\n");
-        printf("Supplied: -uep:%s %s %s\n", uep->endpoint, uep->response, uep->content_type);
-        printf("No correct eup defined\n");
-  }else{
-	printf("Listening on endpoint:%s, reply %s\n", uep->endpoint, uep->content_type!=NULL?uep->content_type:"application/json");
-  }
-
-  free(arg);
-
- return uep;
-}
-*/
 void set_user_proxy(char* cmd){
 
 	char* ptr = strtok(cmd,"=");
@@ -1994,6 +1976,7 @@ int main(int args, char* argv[]){
 	char dir[1024];
 	int use_ssl=0;
 	int use_tls=0;
+	user_endpoint* uep = NULL;
 
 	get_work_dir(dir,1024);
 
@@ -2041,7 +2024,7 @@ int main(int args, char* argv[]){
 	  else if(strcmp(argv[i],"-i")==0) dump_c=1;
 	  else if(strcmp(argv[i],"-d")==0) c_debug=1;
 	  else if(strstr(argv[i],"-uep")!=NULL){
-	    user_uep = get_user_endpoint(strstr(argv[i],"-uep"));
+	    uep = get_user_endpoint(strstr(argv[i],"-uep"));
 	  }
 	  else if(strstr(argv[i],"-proxy")!=NULL){
 	    set_user_proxy(&argv[i][7]);
@@ -2060,6 +2043,8 @@ int main(int args, char* argv[]){
 	if(c_debug) printf("\nDebug mode is on\n");
 
 	if(init_conf(&conf_file[0], &serv_conf)>-1){
+
+	  if(uep!=NULL) add_user_endpoint(uep,&serv_conf);
 
 	  // Add User proxy target if exists.
 	  if(user_proxy_target!=NULL){
