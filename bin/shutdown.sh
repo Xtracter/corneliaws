@@ -3,6 +3,15 @@
 
 	if [[ $1 == "" ]];
 	then
+	echo "shutdown" > $CORNELIA_HOME/stat
+	curl -s -k http://localhost:8080 > /dev/null
+	curl -s -k https://localhost:8443 > /dev/null
+	curl -s -k https://localhost:8444 > /dev/null
+	fi
+
+
+	if [[ $1 == "kill" ]];
+	then
 		ps -ef | grep './cornelia_d' | grep -v grep | awk '{print $2}' | xargs -r kill -9
 	fi
 

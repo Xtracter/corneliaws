@@ -144,6 +144,12 @@ void init_ssl_server(const server_conf* serv_conf){
 	    return;
 	  }
 
+	  if(check_shutdown(1)) {
+            printf("Shutdown received. Cornelia SSL exiting.\n");
+            shutdown(sockfd,SHUT_RDWR);
+            break;
+          }
+
 	  cSSL = SSL_new(sslctx);
 	  SSL_set_fd(cSSL, newsockfd);
 	  int ssl_err = SSL_accept(cSSL);

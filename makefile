@@ -21,6 +21,7 @@ misc:
 	$(CC) -o bin/ftp_cornelia -std=c99 -Wall -Wextra -O3 -Iopenssl/include/ -Lopenssl/ src/ftps.c src/misc.c src/ftp.c -lcrypt -lssl -lcrypto 
 	$(CC) -o bin/findip src/findlip.c
 	$(CC) -o bin/jspz -std=c99 -Wall -O3 src/jspz.c
+	$(CC) -o bin/readraw -std=c99 -O3 src/readraw.c
 
 
 clean:

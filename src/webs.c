@@ -85,6 +85,7 @@ proxy_target* user_proxy_target = NULL;
 void add_user_endpoint(user_endpoint*, server_conf* serv);
 void confc(int init);
 
+
 #define CHUNK_SIZE 4096
 #define ACCESS_LOG "log/access.log"
 #define ERROR_LOG  "log/error.log"
@@ -107,12 +108,16 @@ void init_server() {
 	  printf("Fatal: Socket creation failed.\n");
 	  exit(-1);
         }
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0)
+	    printf("setsockopt(SO_REUSEADDR) failed");
+
         memset(&servaddr, 0, sizeof(servaddr));
         servaddr.sin_family = AF_INET;
         servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
         servaddr.sin_port = htons(port);
 
         if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) {
+	  fprintf(stderr,"Fatal: Socket bind failed.\nIs server already running?\nTry bin/restart.sh\n\n");
 	  printf("\nFatal: Socket bind failed.\nIs server already running?\nTry bin/restart.sh\n\n");
 	  exit(-1);
         }
@@ -128,6 +133,11 @@ void init_server() {
 	confc(1);
         while(loop){
 	  connfd = accept(sockfd, (SA*)&cli, &len);
+	  if(check_shutdown(1)) {
+	    printf("Shutdown received. Cornelia HTTP exiting.\n");
+	    shutdown(connfd,SHUT_RDWR);
+	    break;
+	  }
 	  if(auto_reload_conf) confc(0);
 	  if(connfd==-1){
 	  char log_tmp[64];
@@ -160,23 +170,48 @@ void init_server() {
 
 }
 
+void localtime_r(time_t* t, struct tm* tm_info);
+
+int check_shutdown(int mode){
+
+	FILE* fd;
+	char buff[256];
+	int ret=0;
+
+	sprintf(buff,"%s/stat",getenv("CORNELIA_HOME"));
+	if((fd=fopen(buff,"r+"))!=NULL){
+	  if(mode){
+	    	if(fgets(buff,256,fd)!=NULL){
+	     		if(strstr(buff,"shutdown")!=NULL){
+		      		ret=1;
+	     		}
+	    	}
+	  }
+	  else{
+	    fprintf(fd,"running");
+	    ret=0;
+	 }
+	 fclose(fd);
+       }else logc(ERROR,"Bad check_shutdown() file open\n");
+
+ return ret;
+}
+
 void confc(int init){
 
 	struct stat attr;
-	time_t* t;
-
-	//TODO: Fix this..
+	time_t f;
 
 	if (stat(conf_file, &attr) == 0) {
-	  t=&attr.st_mtime;
+	  f=attr.st_mtime;
 	  if(init) {
-	   conf_time = (int)time(t);
+	   conf_time=f;
 	   return;
-	  }
-	  if(conf_time < time(t)){
-	     //reload_conf(conf_file,&serv_conf);
-	     //printf("%s reloaded\n", conf_file);
-	     conf_time=(int)time(t);
+  	  }
+	  if(conf_time < f){
+	   reload_conf(conf_file, &serv_conf);
+	   printf("%s reloaded\n", conf_file);
+	   conf_time = (int)f;
 	  }
 	}
 
@@ -255,7 +290,7 @@ int proxy_connect(char* clientIP, int port){
     struct sockaddr_in serv_addr;
 
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("\n Socket creation error \n");
+        fprintf(stderr,"proxy: Socket creation error \n");
         return -1;
     }
 
@@ -264,8 +299,8 @@ int proxy_connect(char* clientIP, int port){
 
     if (inet_pton(AF_INET, clientIP, &serv_addr.sin_addr)
         <= 0) {
-        printf(
-            "\nInvalid address/ Address not supported \n");
+        fprintf(stderr,
+            "\nproxy: Invalid address/ Address not supported \n");
         return -1;
     }
 
@@ -1951,7 +1986,7 @@ void usage(){
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
 	printf("-d \tdebug mode\n");
-//	printf("-reload\t Reload conf on change\n");
+	printf("-reload\t Reload conf on change\n");
 	printf("-head \tprint request headers to stdout\n");
 	printf("-proxy\tset up proxy target [-proxy:<local_host>=<remote_host>:<port>:<type> (http or ssl)]\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"name\\\":\\\"value\\\"}%%application/json\n");
@@ -2035,6 +2070,7 @@ int main(int args, char* argv[]){
 	 }
 	}
 
+	check_shutdown(0);
 	if(read_http_responses()==-1) return -1;
 
 	memset(&serv_conf,0,sizeof(server_conf));

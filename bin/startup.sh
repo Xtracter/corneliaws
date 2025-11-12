@@ -32,7 +32,6 @@ echo "***********************************************"
 if [[ $1 != "http" ]] && [[ $1 != "ssl" ]] && [[ $1 != "tls" ]] && [[ $1 != "all" ]];
 then
 $CORNELIA_HOME/bin/cornelia_d $1 $2 $3 -c $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
-$CORNELIA_HOME/bin/cornelia_d -tls $1 $2 $3 -c  $CORNELIA_HOME/conf/corny.conf 2> $CORNELIA_HOME/log/error.log &
 fi
 
 if [[ $1 == "http" ]];

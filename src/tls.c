@@ -121,6 +121,12 @@ void init_tls_server(const server_conf* serv_conf) {
         if (SSL_accept(ssl) <= 0) {
 	    perror("Error accept\n");
         } else {
+	  if(check_shutdown(1)) {
+            printf("Shutdown received. Cornelia SSL/TLS exiting.\n");
+            shutdown(sock,SHUT_RDWR);
+            break;
+          }
+
 	   int pid=fork();
 	   if(pid>0){
               memset(&cip[0],0,16);

@@ -62,6 +62,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <errno.h>
 #include <stdarg.h>
 
+int check_shutdown(int mode);
 void handle_request(int sockfd, char* clientIP, void* cSSL);
 void set_user_proxy(char* cmd);
 
