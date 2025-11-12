@@ -117,17 +117,13 @@ int main(int args, char* argv[]){
 	  sprintf(buffer,"GET %s HTTP/1.1\nHost: %s:%d\n\n", path,host,port);
 	}
 
-	printf("%s %s %d",host,path,port);
-
-	printf("Trying: %s (%s)\n", buffer,ip);
-
 	int fd = client_connect(ip,port);
 	if(fd==-1) {
 	  printf("Error\n");
 	  return -1;
 	}
 
-	write(fd,buffer,strlen(buffer));
+	r=write(fd,buffer,strlen(buffer));
 
 	while((r=read(fd,buffer,1024))){
 	  printf("%d\n",r);
