@@ -59,9 +59,15 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define D_400_FORBIDDEN 		"400 Forbidden"
 #define BUFF_SIZE 			5000
 
+#define HTTP_PROTO			"http"
+#define SSL_PROTO			"ssl"
+#define TLS_PROTO			"tls"
+
+
 int c_debug = 0;
 int dump_req=0;
 int conf_time=0;
+char local_proto[6];
 server_conf serv_conf;
 auth_conf   a_conf;
 
@@ -154,23 +160,23 @@ void init_server() {
 }
 
 void confc(int init){
-
+	/*
 	struct stat attr;
 	time_t* t;
 
 	if (stat(conf_file, &attr) == 0) {
 	  t=&attr.st_mtime;
-	  if(conf_time<(int)time(t)){
-	    conf_time=(int)time(t);
+	  if(conf_time>(int)time(t)){
 	    if(init){
 	     reload_conf(conf_file,&serv_conf);
 	     printf("%s reloaded\n", conf_file);
+	     conf_time=(int)time(t);
 	    }
 	  }
 	} else {
 	  logc(ERROR, "Can't stat conf file..");
 	}
-
+	*/
 }
 
 void logc(int type, const char* string, ...){
@@ -209,39 +215,6 @@ int ip_to_domain(const char* ip, char* host) {
         sa_len = sizeof(struct sockaddr_in);
     }
     else {
-        struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)&sa;
-        if (inet_pton(AF_INET6, ip, &sa6->sin6_addr) == 1) {
-            sa6->sin6_family = AF_INET6;
-            sa_len = sizeof(struct sockaddr_in6);
-        } else {
-            fprintf(stderr, "Invalid IP address format: %s\n", ip);
-            return EXIT_FAILURE;
-        }
-    }
-
-    int ret = getnameinfo((struct sockaddr *)&sa, sa_len,
-                          host, sizeof(host),
-                          NULL, 0, 8);
-    if (ret != 0) {
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-
-
-int ip_do_domain(const char* ip, char* host) {
-
-    struct sockaddr_storage sa;
-    socklen_t sa_len;
-
-    memset(&sa, 0, sizeof(sa));
-
-    struct sockaddr_in *sa4 = (struct sockaddr_in *)&sa;
-    if (inet_pton(AF_INET, ip, &sa4->sin_addr) == 1) {
-        sa4->sin_family = AF_INET;
-        sa_len = sizeof(struct sockaddr_in);
-    }else {
         struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)&sa;
         if (inet_pton(AF_INET6, ip, &sa6->sin6_addr) == 1) {
             sa6->sin6_family = AF_INET6;
@@ -346,22 +319,35 @@ int handle_proxy(int sockfd, http_request* request){
 
         if(c_debug) printf("[handle_proxy]\n");
 
-        strcpy(buffer,get_header(request,"Host="));
+	char* head = get_header(request,"Host=");
+	printf("head:%s\n", head);
+	if(head==NULL){
+	  return -1;
+	}
+
+        strcpy(buffer,head);
         tok = strtok(buffer,":");
+	printf("%d\n",tok==NULL);
         if(tok!=NULL){
                 strcpy(rem_host,tok);
-                rem_port=atoi(strtok(NULL,":"));
-        }else return -1;
-
+                tok=strtok(NULL,":");
+		if(tok==NULL) rem_port=80;
+		else rem_port = atoi(tok);
+        }else {
+	  	if(c_debug) printf("[exit_handle_proxy 1]\n");
+		return -1;
+	}
         n=0;
         memset(buffer,0,BUFF_SIZE);
         while(n<64){
                 if(serv_conf.v_proxys[n]==NULL) break;
-                if(strcmp(rem_host,serv_conf.v_proxys[n]->host)==0 ||
+	        if(c_debug) printf("'%s' '%s':%d | '%s'\n", serv_conf.v_proxys[n]->host, serv_conf.v_proxys[n]->proxy_host,
+			serv_conf.v_proxys[n]->proxy_port,rem_host);
+    	            if(strcmp(rem_host,serv_conf.v_proxys[n]->host)==0 ||
                         strcmp("all", serv_conf.v_proxys[n]->host)==0) {
                         domain_to_ip(buffer,serv_conf.v_proxys[n]->proxy_host);
 			strcpy(thost, serv_conf.v_proxys[n]->proxy_host);
-	 		sprintf(tport,"%d",rem_port);
+	 		sprintf(tport,"%d",serv_conf.v_proxys[n]->proxy_port);
                         rem_port = serv_conf.v_proxys[n]->proxy_port;
 			strcpy(proxy_host, serv_conf.v_proxys[n]->proxy_host);
 			if(strcmp(serv_conf.v_proxys[n]->type,"http")==0) SSL=0;
@@ -369,14 +355,18 @@ int handle_proxy(int sockfd, http_request* request){
                 }
                 n++;
         }
-	if(c_debug) printf("Proxy: %s %d mode:%s\n", buffer, rem_port, (SSL==0?"http":"ssl"));
-        if(strlen(buffer)==0) return -2;
+	if(c_debug) printf("Proxy: %s %s mode:%s\n", thost, tport, (SSL==0?"http":"ssl"));
+        if(strlen(buffer)==0) {
+	  if(c_debug) printf("[exit_handle_proxy 2]\n");
+	  return -1;
+	}
 
 	if(SSL) {
 	  #ifndef NO_SSL
 	  if(open_tls_socket(thost,tport,&tlsc)==-1){
 	   logc(ERROR, "tls con failed: %s %s\n", buffer, tport);
 	   free_client_socket(tlsc.ctx,tlsc.ssl);
+	   if(c_debug) printf("[exit_handle_proxy 3]\n");
 	   return -1;
 	  }
 	  #endif
@@ -397,8 +387,8 @@ int handle_proxy(int sockfd, http_request* request){
                   sprintf(buffer,"Connection: close\n");
 		}
 		else if(strstr(request->headers[i],"Host=")!=NULL){
-		  if(rem_port!=80){
-                    sprintf(buffer,"Host: %s:%d\n", proxy_host,rem_port);
+		  if(strcmp(tport,"80")!=0){
+                    sprintf(buffer,"Host: %s:%s\n", proxy_host, tport);
 		  }else{
                     sprintf(buffer,"Host: %s\n", proxy_host);
 		  }
@@ -432,6 +422,8 @@ int handle_proxy(int sockfd, http_request* request){
 	  #endif
 	}
         else close(clientfd);
+
+	if(c_debug) printf("[exit_handle_proxy]\n");
 
         return 0;
 }
@@ -1407,15 +1399,17 @@ char* get_header(const http_request *request, const char* header){
 	int n=0;
 	char *ptr;
 
-	if(c_debug) printf("[get_header]\n");
+	if(c_debug) printf("[get_header %s]\n", header);
+
 	while(1){
-	 if(request->headers[n]==NULL) break;
+	 if(request->headers[n]==NULL || strstr(request->headers[n],"=")==NULL) break;
 	 if(!startsw(request->headers[n], header)){
 	   ptr = strstr(request->headers[n],"=");
 	   if(ptr!=NULL) return ptr+1;
 	   else return NULL;
 	 }
   	 n++;
+	 if(n>50) break;
 	}
 
 	if(c_debug) printf("[exit get_header]\n");
@@ -1681,11 +1675,11 @@ int exec_request(int sockfd, char* clientIP, void* cSSL){
 
 	// Handle proxy relay.
 	if(serv_conf.v_proxys[0]!=NULL){
-	  if(handle_proxy(sockfd,&request)>-2){
+	  if(handle_proxy(sockfd,&request)==0){
   	        free_request(&request);
 		return CONN_CLOSE;
 	  }
-	  if(c_debug) printf("No prixy match continuing\n");
+	  if(c_debug) printf("No proxy match continuing\n");
 	}
 
 	// Set virtual path if Host header matches.
@@ -1980,6 +1974,8 @@ int main(int args, char* argv[]){
 
 	get_work_dir(dir,1024);
 
+	memset(local_proto,0,sizeof(local_proto));
+
 	if(getenv("CORNELIA_HOME")==NULL){
 	  printf("env CORNELIA_HOME should be set to cornelia_d workdir\n");
 	  printf("export CORNELIA_HOME=<dir of cornelia_d>\n");
@@ -2065,9 +2061,11 @@ int main(int args, char* argv[]){
 	  else {
 	   check_conf(use_ssl, use_tls);
 	   if(use_ssl==0 && use_tls==0){
+		strcpy(local_proto, HTTP_PROTO);
 		init_server();
 	   }else if(use_ssl){
 		#ifndef NO_SSL
+		strcpy(local_proto, SSL_PROTO);
 		init_ssl_server(&serv_conf);
 		#endif
 		#ifdef NO_SSL
@@ -2075,6 +2073,7 @@ int main(int args, char* argv[]){
 		#endif
 	   }else if(use_tls){
 		#ifndef NO_SSL
+		strcpy(local_proto, TLS_PROTO);
 		init_tls_server(&serv_conf);
 		#endif
 		#ifdef NO_SSL
