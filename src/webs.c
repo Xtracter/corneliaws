@@ -67,6 +67,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 int c_debug = 0;
 int dump_req=0;
 int conf_time=0;
+int auto_reload_conf=0;
 char local_proto[6];
 server_conf serv_conf;
 auth_conf   a_conf;
@@ -124,10 +125,10 @@ void init_server() {
         len = sizeof(cli);
         printf("\nCornelia listening on %d [HTTP]\n", serv_conf.port);
 
-	confc(0);
+	confc(1);
         while(loop){
 	  connfd = accept(sockfd, (SA*)&cli, &len);
-	  confc(1);
+	  if(auto_reload_conf) confc(0);
 	  if(connfd==-1){
 	  char log_tmp[64];
 	  sprintf(log_tmp,"Client socket failed. errno %d\n", errno);
@@ -160,23 +161,25 @@ void init_server() {
 }
 
 void confc(int init){
-	/*
+
 	struct stat attr;
 	time_t* t;
 
+	//TODO: Fix this..
+
 	if (stat(conf_file, &attr) == 0) {
 	  t=&attr.st_mtime;
-	  if(conf_time>(int)time(t)){
-	    if(init){
-	     reload_conf(conf_file,&serv_conf);
-	     printf("%s reloaded\n", conf_file);
-	     conf_time=(int)time(t);
-	    }
+	  if(init) {
+	   conf_time = (int)time(t);
+	   return;
 	  }
-	} else {
-	  logc(ERROR, "Can't stat conf file..");
+	  if(conf_time < time(t)){
+	     //reload_conf(conf_file,&serv_conf);
+	     //printf("%s reloaded\n", conf_file);
+	     conf_time=(int)time(t);
+	  }
 	}
-	*/
+
 }
 
 void logc(int type, const char* string, ...){
@@ -320,14 +323,12 @@ int handle_proxy(int sockfd, http_request* request){
         if(c_debug) printf("[handle_proxy]\n");
 
 	char* head = get_header(request,"Host=");
-	printf("head:%s\n", head);
 	if(head==NULL){
 	  return -1;
 	}
 
         strcpy(buffer,head);
         tok = strtok(buffer,":");
-	printf("%d\n",tok==NULL);
         if(tok!=NULL){
                 strcpy(rem_host,tok);
                 tok=strtok(NULL,":");
@@ -1950,6 +1951,7 @@ void usage(){
 	printf("-tsl\t<server_tsl_port>\n");
 	printf("-i \tprints config\n");
 	printf("-d \tdebug mode\n");
+//	printf("-reload\t Reload conf on change\n");
 	printf("-head \tprint request headers to stdout\n");
 	printf("-proxy\tset up proxy target [-proxy:<local_host>=<remote_host>:<port>:<type> (http or ssl)]\n");
 	printf("-uep\tset up endpoint [-uep:/myendpoint%%{\\\"name\\\":\\\"value\\\"}%%application/json\n");
@@ -2014,6 +2016,7 @@ int main(int args, char* argv[]){
                  return -1;
                 }
           }
+	  else if(strcmp(argv[i],"-reload")==0) auto_reload_conf=1;
 	  else if(strcmp(argv[i],"-head")==0) dump_req=1;
 	  else if(strcmp(argv[i],"-ssl")==0) use_ssl=1;
 	  else if(strcmp(argv[i],"-tls")==0) use_tls=1;
