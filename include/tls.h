@@ -20,7 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #ifndef _CORNY_TLS_
-#define _CORNY_TLS
+#define _CORNY_TLS_
 #include "webs.h"
 void init_tls_server(const server_conf* serv_conf);
 void free_client_socket(void* ctx, void* ssl);

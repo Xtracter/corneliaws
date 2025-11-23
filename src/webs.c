@@ -712,17 +712,17 @@ void list_dir (const char* dir, char* buffer) {
 
 void send_list_dir(http_request* request){
 
-	int size = 1024;
+	int size = 2048+1024;
 	char buffer[size];
-	char dir[size];
-	char tmp[size];
+	char dir[size+1024];
+	char tmp[size+2048];
 	char head[] = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: text/html\r\n";
 
 	memset(buffer,0,size);
 	memset(dir,0,size);
 	memset(tmp,0,size);
 
-	sprintf(dir,"%s/%s%s%s", &serv_conf.workdir[0], &request->virtual_path[0], &request->path[0], &request->file[0]);
+	sprintf(dir,"%s/%s%s%s", serv_conf.workdir, request->virtual_path, request->path, request->file);
 	if(file_exists(dir)){
 	  list_dir(dir,buffer);
 	  sprintf(tmp,"<!DOCTYPE html>\n<html><head><title>%s</title></head><body><b><i>Cornelia Web Server by CrazedoutSoft (c)</i></b><br><h1>Index of %s</h1>\n",
@@ -1334,12 +1334,14 @@ int handle_user_enpoints(http_request* request){
 	    }
 
 	    tmp = (char*)realloc(tmp,255);
-	    if(uep->content_type!=NULL){
+	    //if(uep->content_type!=NULL){
+	    if(strlen(uep->content_type)>0){
 	      sprintf(tmp,"Content-Type: %s\n", uep->content_type);
 	    }else sprintf(tmp,"Content-Type: application/json\n");
 	    socket_write(request, tmp, strlen(tmp));
 
-	    if(uep->response!=NULL) {
+	    //if(uep->response!=NULL) {
+	    if(strlen(uep->response)>0) {
 	      tmp = realloc(tmp,128);
 	      sprintf(tmp,"Content-Length: %d\n\n", (int)strlen(uep->response));
 	      socket_write(request, tmp, strlen(tmp));
