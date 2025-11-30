@@ -1320,9 +1320,7 @@ int handle_user_enpoints(http_request* request){
 	if(c_debug) printf("[parse uep] %s\n",request->path);
 	tmp = (char*)malloc(4096);
 	sprintf(tmp,"%s%s", &request->path[0], request->file);
-	printf("%s\n",tmp);
 	while((uep=serv_conf.uep[n++])!=NULL){
-	  printf("1\n");
 	  if(strcmp(tmp,uep->endpoint)==0){
 	    if(c_debug) printf("[start uep]\n");
 	    if(c_debug) printf("eup:%s %s\n", tmp, uep->endpoint);
