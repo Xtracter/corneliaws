@@ -1312,6 +1312,7 @@ void exec_response(http_request *request){
 int handle_user_enpoints(http_request* request){
 
 	int res=0;
+	/*
 	int n=0;
 	char* tmp;
 	char* origins = (char*)malloc(4096);
@@ -1334,21 +1335,22 @@ int handle_user_enpoints(http_request* request){
 	    }
 
 	    tmp = (char*)realloc(tmp,255);
-	    //if(uep->content_type!=NULL){
-	    if(strlen(uep->content_type)>0){
-	      sprintf(tmp,"Content-Type: %s\n", uep->content_type);
-	    }else sprintf(tmp,"Content-Type: application/json\n");
-	    socket_write(request, tmp, strlen(tmp));
-
-	    //if(uep->response!=NULL) {
-	    if(strlen(uep->response)>0) {
-	      tmp = realloc(tmp,128);
-	      sprintf(tmp,"Content-Length: %d\n\n", (int)strlen(uep->response));
+	    if(uep->content_type!=NULL){
+	      if(strlen(uep->content_type)>0){
+	        sprintf(tmp,"Content-Type: %s\n", uep->content_type);
+	      }else sprintf(tmp,"Content-Type: application/json\n");
 	      socket_write(request, tmp, strlen(tmp));
-	      tmp = realloc(tmp,strlen(uep->response)+2);
- 	      sprintf(tmp,"%s", uep->response);
-	      socket_write(request, tmp, strlen(tmp));
-	   }
+	    }
+	    if(uep->response!=NULL) {
+	      if(strlen(uep->response)>0) {
+	        tmp = realloc(tmp,128);
+	        sprintf(tmp,"Content-Length: %d\n\n", (int)strlen(uep->response));
+	        socket_write(request, tmp, strlen(tmp));
+	        tmp = realloc(tmp,strlen(uep->response)+2);
+ 	        sprintf(tmp,"%s", uep->response);
+	        socket_write(request, tmp, strlen(tmp));
+	     }
+	 }
  	  res=1;
 	  break;
 	}
@@ -1357,7 +1359,7 @@ int handle_user_enpoints(http_request* request){
 
 	free(origins);
   	free(tmp);
-
+	*/
  return res;
 
 }
